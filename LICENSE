@@ -1,0 +1,36 @@
+Sungrow Steuerung
+Copyright (C) by Elric M. Alle Rechte vorbehalten.
+
+NUTZUNGSBEDINGUNGEN
+
+1. Erlaubt ist ausschließlich die private, nicht gewerbliche Nutzung zu Test- und Lernzwecken.
+   Dazu gehört, die Software herunterzuladen, auf eigenen Geräten zu betreiben, den Quelltext zu lesen
+   und für den eigenen privaten Gebrauch anzupassen.
+
+2. Untersagt sind insbesondere
+   a) jede kommerzielle Nutzung, auch mittelbar (zum Beispiel als Teil eines Produkts, einer Dienstleistung,
+      einer Installation beim Kunden oder einer bezahlten Beratung),
+   b) die Nutzung im Geschäftsbetrieb eines Unternehmens, einer Behörde oder einer sonstigen Organisation,
+   c) der Verkauf, die Vermietung, die Lizenzierung oder sonstige entgeltliche Weitergabe der Software
+      oder von Teilen davon, auch in veränderter Form.
+
+3. Werden Kopien oder veränderte Fassungen unentgeltlich weitergegeben, müssen dieser Lizenztext und der
+   Urhebervermerk "(C) by Elric M." vollständig erhalten bleiben.
+
+4. HAFTUNGSAUSSCHLUSS
+   Die Software wird ohne jede Gewährleistung oder Garantie bereitgestellt, weder ausdrücklich noch
+   stillschweigend, insbesondere ohne Gewähr für Richtigkeit, Vollständigkeit, Eignung für einen bestimmten
+   Zweck oder fehlerfreien Betrieb. Die Benutzung erfolgt ausschließlich auf eigene Gefahr.
+   Die Software liest und SCHREIBT Einstellungen eines Wechselrichters und kann Lade- und Entladevorgänge
+   einer Batterie auslösen. Falsche Registeradressen oder Werte können Fehlfunktionen, Ertragsausfall,
+   Schäden an Geräten oder Batterie sowie den Verlust von Garantie- oder Gewährleistungsansprüchen
+   gegenüber dem Hersteller zur Folge haben. Arbeiten am Batteriespeicher (Entnehmen und Einsetzen von
+   Modulen) dürfen nur nach Herstellervorgaben und von dafür qualifizierten Personen ausgeführt werden.
+   Soweit gesetzlich zulässig, ist eine Haftung des Urhebers für Schäden jeder Art ausgeschlossen.
+
+5. Marken
+   Sungrow, WiNet und die Gerätebezeichnungen sind Marken ihrer jeweiligen Inhaber. Dieses Projekt ist
+   privat, steht in keiner Verbindung zu Sungrow und wird von Sungrow weder unterstützt noch geprüft.
+
+6. Fremdbestandteile
+   public/vendor/chart.umd.js ist Chart.js und steht unter der MIT-Lizenz (siehe public/vendor/chart.LICENSE.md).

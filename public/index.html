@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<!--
+  Sungrow Steuerung – (C) by Elric M.
+  Nur für die private Nutzung zu Test- und Lernzwecken. Kommerzielle Verwendung, Verwendung im Geschäftsbetrieb und
+  Weiterverkauf untersagt. Benutzung auf eigene Gefahr, ohne Gewährleistung oder Garantie. Siehe LICENSE und HANDBUCH.md.
+-->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sungrow Steuerung – Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E7EAED; --panel:#F8F9FA; --ink:#17202A; --muted:#5A6673; --line:#C9D0D7; --track:#DDE2E7;
+  --pv:#C98A00; --grid:#2A5FC4; --batt:#0A8575; --house:#3C4652; --alert:#C2352B; --hi:#17202A; --lo:#2A5FC4;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#141A21; --panel:#1C242D; --ink:#E6EAEE; --muted:#97A3AF; --line:#34404C; --track:#2A343F;
+    --pv:#E5A823; --grid:#6F9BEF; --batt:#35B9A6; --house:#B4BEC8; --alert:#EF6A5F; --hi:#E6EAEE; --lo:#6F9BEF; }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Barlow Semi Condensed",Bahnschrift,"DIN Alternate","Arial Narrow",sans-serif;
+  font-size:17px;line-height:1.35;font-variant-numeric:tabular-nums}
+.wrap{max-width:1500px;margin:0 auto;padding:20px 24px 48px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 28px;padding-bottom:14px;border-bottom:2px solid var(--ink)}
+h1{font-size:30px;font-weight:600;margin:0;letter-spacing:.01em}
+h2{font-size:20px;font-weight:600;margin:0 0 12px}
+.state{font-size:18px}
+.state b{font-weight:600}
+.stamp{margin-left:auto;color:var(--muted)}
+.wbtn{font:inherit;font-size:15px;padding:4px 12px;border:1px solid var(--ink);background:none;color:var(--ink);cursor:pointer}
+.wbtn.on{background:var(--pv);border-color:var(--pv);color:#fff}
+.wbtn:focus-visible{outline:3px solid var(--grid);outline-offset:2px}
+.top{display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid var(--ink)}
+.top a{font-size:18px;padding:8px 20px;border:2px solid var(--ink);border-bottom:0;color:var(--ink);text-decoration:none;margin-bottom:-2px}
+.top a[aria-current="page"]{background:var(--ink);color:var(--panel)}
+.top a:hover,.top a:focus-visible{background:var(--track)} .top a[aria-current="page"]:hover{background:var(--ink)}
+.top .copy{margin-left:auto;align-self:center;color:var(--muted);font-size:15px;white-space:nowrap;padding:0 2px 6px 16px}
+.top a.live::after{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--pv);margin-left:9px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--batt);margin-right:8px;transform:translateY(-1px)}
+.dot.off{background:var(--alert)}
+.banner{display:none;margin-top:14px;padding:12px 16px;border-left:5px solid var(--alert);background:var(--panel)}
+.banner.on{display:block}
+.layout{display:grid;grid-template-columns:minmax(380px,470px) 1fr;gap:20px;margin-top:20px;align-items:start}
+.col{display:grid;gap:20px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);padding:18px 20px;min-width:0}
+
+/* Batterieturm */
+.tower-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;border:2px solid var(--ink);border-bottom:0;padding:12px 14px;background:var(--bg)}
+.soc{font-size:58px;font-weight:600;line-height:.9}
+.soc small{font-size:24px;font-weight:500;margin-left:2px}
+.tower-head dl{margin:0;display:grid;grid-template-columns:auto auto;gap:0 12px;text-align:right}
+.tower-head dt{color:var(--muted)}
+.tower-head dd{margin:0;font-weight:500}
+.tower{border:2px solid var(--ink)}
+.mod{display:grid;grid-template-columns:96px 1fr;border-bottom:1px solid var(--line)}
+.mod:last-child{border-bottom:0}
+.mod .name{padding:8px 6px 8px 12px;font-weight:600;white-space:nowrap;border-right:1px solid var(--line)}
+.mod .name span{display:block;white-space:normal;font-weight:400;font-size:14px;color:var(--muted);line-height:1.1}
+.mod .meas{position:relative;padding:8px 12px 6px}
+.track{position:relative;height:12px;background:var(--track)}
+.range{position:absolute;top:0;bottom:0;background:var(--batt);min-width:3px}
+.mod.is-lo .range{background:var(--lo)}
+.mod.is-hi .range{background:var(--hi)}
+.nums{display:flex;justify-content:space-between;font-size:15px;margin-top:3px;color:var(--muted)}
+.nums b{color:var(--ink);font-weight:500}
+.axis{display:grid;grid-template-columns:96px 1fr;margin-top:4px}
+.axis div{position:relative;height:20px;margin:0 12px;font-size:14px;color:var(--muted)}
+.axis i{position:absolute;top:0;font-style:normal;transform:translateX(-50%);white-space:nowrap}
+.axis i::before{content:"";position:absolute;left:50%;top:-5px;height:5px;border-left:1px solid var(--muted)}
+.foot{border:2px solid var(--ink);border-top:0;height:12px;background:var(--ink)}
+.spread{display:flex;align-items:baseline;gap:14px;margin:16px 0 4px;flex-wrap:wrap}
+.spread strong{font-size:40px;font-weight:600;line-height:1}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:15px;color:var(--muted);margin-top:8px}
+.legend span::before{content:"";display:inline-block;width:12px;height:12px;margin-right:6px;transform:translateY(1px);background:var(--batt)}
+.legend .l-lo::before{background:var(--lo)} .legend .l-hi::before{background:var(--hi)}
+.hint{color:var(--muted);font-size:15px;margin:10px 0 0;max-width:60ch}
+
+/* Sammelschiene */
+.bus{width:100%;height:auto;display:block}
+.bus text{font-family:inherit;fill:var(--ink)}
+.bus .lbl{font-size:19px;font-weight:600}
+.bus .val{font-size:30px;font-weight:600}
+.bus .sub{font-size:16px;fill:var(--muted)}
+.bus .bar{stroke:var(--ink);stroke-width:8;stroke-linecap:square}
+.bus .feed{stroke-width:5;fill:none;stroke-dasharray:10 9}
+.bus .idle{stroke:var(--line);stroke-dasharray:none}
+@keyframes toBus{to{stroke-dashoffset:-38}} @keyframes fromBus{to{stroke-dashoffset:38}}
+.bus .in{animation:toBus 1.2s linear infinite} .bus .out{animation:fromBus 1.2s linear infinite}
+@media (prefers-reduced-motion:reduce){.bus .in,.bus .out{animation:none}}
+
+
+
+/* Modulvergleich */
+.cmp{display:grid;grid-template-columns:1.15fr 1fr;gap:28px;align-items:start}
+.cmp h3{font-size:17px;font-weight:600;margin:0 0 10px}
+.cols{position:relative;height:230px;margin-left:46px;border-left:1px solid var(--muted);border-bottom:1px solid var(--muted)}
+.cols .gl{position:absolute;left:0;right:0;border-top:1px solid var(--line)}
+.cols .gl span{position:absolute;left:-46px;top:-9px;width:40px;text-align:right;font-size:13px;color:var(--muted)}
+.cols .bars{position:absolute;inset:0;display:flex}
+.cols .c{flex:1;position:relative}
+.cols .c i{position:absolute;left:22%;right:22%;background:var(--batt);min-height:5px}
+.cols .c.is-lo i{background:var(--lo)} .cols .c.is-hi i{background:var(--hi)}
+.cols .c b{position:absolute;left:0;right:0;text-align:center;font-size:13px;font-weight:500;white-space:nowrap}
+.colnames{display:flex;margin-left:46px;font-size:14px;color:var(--muted)}
+.colnames span{flex:1;text-align:center;padding-top:4px}
+.colnames span.mark{color:var(--lo);font-weight:600}
+.dev{display:grid;grid-template-columns:66px 1fr 74px 96px;align-items:center;gap:0 8px;font-size:15px;height:28px}
+.dev .n{font-weight:600}
+.dev .t{position:relative;height:14px;background:var(--track)}
+.dev .t::after{content:"";position:absolute;left:50%;top:-4px;bottom:-4px;border-left:2px solid var(--ink)}
+.dev .t i{position:absolute;top:0;bottom:0;background:var(--batt);min-width:2px}
+.dev.neg .t i{background:var(--lo)} .dev.pos .t i{background:var(--hi)}
+.dev .v{text-align:right;font-weight:500}
+.dev .e{text-align:right;color:var(--muted);font-size:14px;white-space:nowrap}
+.devhead{display:grid;grid-template-columns:66px 1fr 74px 96px;gap:0 8px;font-size:13px;color:var(--muted);margin-bottom:2px}
+.devhead span{text-align:right}
+.est{margin:14px 0 0;padding:12px 14px;border-left:4px solid var(--lo);background:var(--bg);max-width:none}
+.est b{font-weight:600}
+@media (max-width:900px){.cmp{grid-template-columns:1fr}}
+
+/* Verläufe */
+.bar-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.bar-top h2{margin:0}
+.seg{display:inline-flex;border:1px solid var(--ink)}
+.seg button{font:inherit;font-size:16px;background:none;color:var(--ink);border:0;border-right:1px solid var(--ink);padding:4px 14px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.seg button:focus-visible{outline:3px solid var(--grid);outline-offset:2px}
+.chart{position:relative;height:250px}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+
+/* Tabellen */
+table{border-collapse:collapse;width:100%}
+th,td{text-align:right;padding:6px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:500;color:var(--muted)}
+th:first-child,td:first-child{text-align:left;padding-left:0}
+td:last-child,th:last-child{padding-right:0}
+.scroll{overflow-x:auto}
+.down{color:var(--batt)} .up{color:var(--alert)}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px 24px;margin:0}
+.facts dt{color:var(--muted);font-size:15px}
+.facts dd{margin:0;font-size:22px;font-weight:500}
+.warn{margin:0 0 14px;padding:10px 14px;border-left:5px solid var(--alert);background:var(--bg);max-width:none}
+.warn b{font-weight:600}
+.three{display:grid;grid-template-columns:1.25fr 1.4fr;gap:20px}
+
+@media (max-width:1100px){.layout{grid-template-columns:1fr}.charts,.three{grid-template-columns:1fr}}
+@media (max-width:520px){.wrap{padding:14px 12px 36px}.soc{font-size:46px}.mod,.axis{grid-template-columns:84px 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="top" aria-label="Bereiche"><a href="/" aria-current="page">Monitor</a><a href="/einstellungen">Einstellungen</a><a href="/matching" id="navM">Matching</a><a href="/anlage">Anlage</a><span class="copy">(C) by Elric M.</span></nav>
+  <header>
+    <h1 id="plant">Sungrow Monitor</h1>
+    <div class="state"><span class="dot" id="dot"></span><b id="sysState">verbinde …</b> <span id="emsState"></span></div>
+    <div class="stamp" id="stamp"></div>
+    <button type="button" class="wbtn" id="winetBtn" title="Gibt die Web-Anmeldung am WiNet-S frei, damit du dich dort im Browser einloggen kannst. Solange kommen keine Zellwerte.">WiNet-S freigeben</button>
+  </header>
+  <div class="banner" id="banner" role="alert"></div>
+
+  <div class="layout">
+    <!-- linke Spalte: der Turm -->
+    <div class="col">
+      <section class="panel" aria-labelledby="h-tower">
+        <h2 id="h-tower">Batterieturm, Zellspannungen je Modul</h2>
+        <div class="tower-head">
+          <div class="soc"><span id="soc">–</span><small>%</small></div>
+          <dl>
+            <dt>Spannung</dt><dd id="bv">–</dd>
+            <dt>Strom</dt><dd id="ba">–</dd>
+            <dt>Leistung</dt><dd id="bp">–</dd>
+            <dt>Temperatur</dt><dd id="bt">–</dd>
+          </dl>
+        </div>
+        <div class="tower" id="tower"></div>
+        <div class="foot"></div>
+        <div class="axis"><span></span><div id="axis"></div></div>
+        <div id="cellInfo">
+          <div class="spread"><strong id="spread">–</strong><span id="spreadText"></span></div>
+          <div class="legend"><span>Bereich niedrigste bis höchste Zelle</span><span class="l-lo">enthält die niedrigste Zelle</span><span class="l-hi">enthält die höchste Zelle</span></div>
+        </div>
+        <p class="hint" id="cellHint"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="h-batt">
+        <h2 id="h-batt">Batterie und Einstellungen</h2>
+        <p class="warn" id="battWarn" style="display:none"></p>
+        <dl class="facts" id="battFacts"></dl>
+        <p class="hint">Hier wird nur gelesen. Ändern lassen sich die Einstellungen auf der Seite <a href="/einstellungen">Einstellungen</a>.</p>
+      </section>
+
+      <div id="strPanels"></div>
+    </div>
+
+    <!-- rechte Spalte -->
+    <div class="col">
+      <section class="panel" aria-labelledby="h-bus">
+        <h2 id="h-bus">Leistungsfluss an der Sammelschiene</h2>
+        <svg class="bus" id="bus" viewBox="0 0 1000 250" role="img" aria-label="Leistungsfluss zwischen Solar, Batterie, Netz und Haus"></svg>
+      </section>
+
+
+      <section class="panel" aria-labelledby="h-cmp" id="cmpPanel">
+        <h2 id="h-cmp">Module im Vergleich</h2>
+        <div class="cmp">
+          <div>
+            <h3>Zellspannung je Modul, niedrigste bis höchste Zelle</h3>
+            <div class="cols" id="cols"></div>
+            <div class="colnames" id="colnames"></div>
+          </div>
+          <div>
+            <h3>Abstand zum Turm</h3>
+            <div id="devs"></div>
+          </div>
+        </div>
+        <p class="est" id="estBox" style="display:none"></p>
+        <p class="hint" id="cmpHint"></p>
+      </section>
+
+      <section class="panel">
+        <div class="bar-top">
+          <h2>Verlauf</h2>
+          <div class="seg" role="group" aria-label="Zeitraum">
+            <button data-h="1">1 h</button><button data-h="6">6 h</button><button data-h="24" aria-pressed="true">24 h</button><button data-h="72">3 Tage</button><button data-h="168">7 Tage</button>
+          </div>
+        </div>
+        <div class="charts">
+          <div><div class="chart"><canvas id="cPower"></canvas></div></div>
+          <div><div class="chart"><canvas id="cSoc"></canvas></div></div>
+          <div><div class="chart"><canvas id="cCells"></canvas></div></div>
+          <div><div class="chart"><canvas id="cMods"></canvas></div></div>
+        </div>
+        <p class="hint" id="chartHint"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="h-bal">
+          <h2 id="h-bal">Balancing-Protokoll</h2>
+          <div class="scroll"><table id="balTable"></table></div>
+          <p class="hint">Je Tag der Moment mit der höchsten Zellspannung (Ladeende) und der mit der niedrigsten (Entladeende). Sinkt die Spreizung am Ladeende von Zyklus zu Zyklus, arbeitet das Balancing. „Zuerst leer“ nennt das Modul, das beim Entladen als erstes unter 3,10 V fällt, und die Anzeige in diesem Moment: das ist ungefähr sein Rückstand.</p>
+      </section>
+
+      <div class="three">
+        <section class="panel" aria-labelledby="h-day">
+          <h2 id="h-day">Energie</h2>
+          <div class="scroll"><table id="dayTable"></table></div>
+        </section>
+        <section class="panel" aria-labelledby="h-inv">
+        <h2 id="h-inv">Wechselrichter</h2>
+        <dl class="facts" id="invFacts"></dl>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/chart.umd.js"></script>
+<script>
+(function(){
+'use strict';
+var $ = function(id){ return document.getElementById(id); };
+var css = function(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); };
+var nf = function(v,d){ return v===null||v===undefined||isNaN(v) ? '–' : Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d}); };
+var kw = function(w){ return nf(Math.abs(w)/1000, Math.abs(w)<9950?2:1)+' kW'; };
+var esc = function(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); };
+var meta = null, hours = 24, charts = {}, lastSettings = {};
+setInterval(function(){ fetch('api/state',{cache:'no-store'}).then(function(r){return r.json();}).then(function(m){ $('navM').className=m.active?'live':''; if(m.needsUser&&!window.__asked){ window.__asked=true; if(window.confirm('Der Matching-Ablauf wartet auf dich. Zur Matching-Seite wechseln?')) location.href='/matching'; } if(!m.needsUser) window.__asked=false; }).catch(function(){}); },15000);
+
+/* ---------- Turm ---------- */
+function renderTower(live){
+  var c = live.cells, b = live.inverter.battery;
+  $('soc').textContent = nf(b.soc,1);
+  $('bv').textContent = nf(b.voltage,1)+' V';
+  $('ba').textContent = nf(Math.abs(b.current),1)+' A';
+  $('bp').textContent = b.power===0 ? 'Ruhe' : (b.power>0?'lädt ':'entlädt ')+kw(b.power);
+  $('bt').textContent = nf(b.temp,1)+' °C';
+  if(!c){ $('tower').innerHTML=''; $('axis').innerHTML=''; $('cellInfo').style.display='none'; return; }
+  $('cellInfo').style.display='';
+  var mods = c.modules.filter(function(m){ return m.min!==null && m.max!==null; });
+  if(!mods.length) return;
+  var lo = Math.min.apply(null,mods.map(function(m){return m.min;}));
+  var hi = Math.max.apply(null,mods.map(function(m){return m.max;}));
+  var span = Math.max(hi-lo, 0.04), pad = span*0.12;
+  var a0 = Math.floor((lo-pad)*100)/100, a1 = Math.ceil((hi+pad)*100)/100;
+  var x = function(v){ return (v-a0)/(a1-a0)*100; };
+  var order = mods.slice().sort(function(p,q){ return meta.topModuleIndex===1 ? p.index-q.index : q.index-p.index; });
+  $('tower').innerHTML = order.map(function(m){
+    var cls = 'mod'+(c.cellMinPos&&c.cellMinPos.module===m.index?' is-lo':'')+(c.cellMaxPos&&c.cellMaxPos.module===m.index?' is-hi':'');
+    var note = meta.moduleNotes && meta.moduleNotes[m.index] ? '<span>'+esc(meta.moduleNotes[m.index])+'</span>' : '';
+    return '<div class="'+cls+'"><div class="name">Modul '+m.index+note+'</div><div class="meas">'+
+      '<div class="track"><div class="range" style="left:'+x(m.min)+'%;width:'+(x(m.max)-x(m.min))+'%"></div></div>'+
+      '<div class="nums"><span><b>'+nf(m.min,4)+'</b> V</span><span>'+nf((m.max-m.min)*1000,1)+' mV</span><span><b>'+nf(m.max,4)+'</b> V</span></div></div></div>';
+  }).join('');
+  var ticks = [], step = (a1-a0)>0.2?0.05:(a1-a0)>0.08?0.02:0.01;
+  for(var v=Math.ceil(a0/step-1e-9)*step; v<=a1+1e-9; v+=step) ticks.push(v);
+  $('axis').innerHTML = ticks.map(function(v){ return '<i style="left:'+x(v)+'%">'+nf(v,2)+'</i>'; }).join('');
+  $('spread').textContent = nf(c.spreadMv,1)+' mV';
+  var p = function(o){ return o ? 'Modul '+o.module+', Zelle '+o.cell : 'Position unbekannt'; };
+  $('spreadText').textContent = 'Spreizung über alle Zellen. Niedrigste: '+p(c.cellMinPos)+'. Höchste: '+p(c.cellMaxPos)+'.';
+}
+
+
+
+/* ---------- Ladezustand aus der Ruhespannung schätzen ----------
+   Generische LFP-Kennlinie je Zelle nach mindestens 20 Minuten Ruhe. Nach dem Laden liegt die Ruhespannung
+   rund 10 mV höher als nach dem Entladen (Hysterese), deshalb zwei Äste. Auf dem Plateau ist die Kurve so flach,
+   dass nur eine Spanne seriös ist: gerechnet wird mit +/- 4 mV. */
+var OCV = {
+  charge:    [[3.000,2],[3.150,6],[3.200,10],[3.240,16],[3.265,22],[3.285,30],[3.297,40],[3.303,50],[3.308,57],[3.313,62],[3.320,66],[3.328,70],[3.333,76],[3.336,85],[3.339,93],[3.345,97],[3.360,99.5],[3.400,100]],
+  discharge: [[2.900,1],[3.080,5],[3.160,10],[3.205,16],[3.235,22],[3.262,30],[3.280,40],[3.288,50],[3.292,58],[3.297,64],[3.305,68],[3.314,72],[3.322,78],[3.327,86],[3.330,93],[3.334,97],[3.345,99.5],[3.380,100]]
+};
+function socFromCurve(v, curve){
+  if(v<=curve[0][0]) return curve[0][1];
+  for(var i=1;i<curve.length;i++){ if(v<=curve[i][0]){ var a=curve[i-1], b=curve[i]; return a[1]+(b[1]-a[1])*(v-a[0])/(b[0]-a[0]); } }
+  return 100;
+}
+function socRange(v, dir){
+  var curves = dir==='charge' ? [OCV.charge] : dir==='discharge' ? [OCV.discharge] : [OCV.charge, OCV.discharge], lo=100, hi=0;
+  curves.forEach(function(c){ [v-0.004, v, v+0.004].forEach(function(x){ var p=socFromCurve(x,c); lo=Math.min(lo,p); hi=Math.max(hi,p); }); });
+  return {lo:lo, hi:hi};
+}
+function fmtRange(r){ var a=Math.round(r.lo/5)*5, b=Math.round(r.hi/5)*5; return a===b ? 'etwa '+a+' %' : a+' bis '+b+' %'; }
+
+/* ---------- Module im Vergleich ---------- */
+function renderCompare(live){
+  var c = live.cells;
+  $('cmpPanel').style.display = c ? '' : 'none';
+  if(!c) return;
+  var mods = c.modules.filter(function(m){ return m.min!==null && m.max!==null; });
+  if(!mods.length) return;
+  var lo = Math.min.apply(null,mods.map(function(m){return m.min;})), hi = Math.max.apply(null,mods.map(function(m){return m.max;}));
+  var span = Math.max(hi-lo,0.02), step = span>0.25?0.05:span>0.1?0.02:span>0.04?0.01:0.005;
+  var a0 = Math.floor((lo-span*0.15)/step)*step, a1 = Math.ceil((hi+span*0.2)/step)*step;
+  var y = function(v){ return (v-a0)/(a1-a0)*100; };
+  var html = '';
+  for(var v=a0; v<=a1+1e-9; v+=step) html += '<div class="gl" style="bottom:'+y(v)+'%"><span>'+nf(v,step<0.01?3:2)+'</span></div>';
+  html += '<div class="bars">'+mods.map(function(m){
+    var cls = 'c'+(c.cellMinPos&&c.cellMinPos.module===m.index?' is-lo':'')+(c.cellMaxPos&&c.cellMaxPos.module===m.index?' is-hi':'');
+    return '<div class="'+cls+'"><i style="bottom:'+y(m.min)+'%;height:'+(y(m.max)-y(m.min))+'%"></i>'+
+      '<b style="bottom:calc('+y(m.max)+'% + 6px)">'+nf((m.min+m.max)/2,3)+'</b></div>';
+  }).join('')+'</div>';
+  $('cols').innerHTML = html;
+  $('colnames').innerHTML = mods.map(function(m){ return '<span'+(meta.moduleNotes&&meta.moduleNotes[m.index]?' class="mark"':'')+'>M'+m.index+'</span>'; }).join('');
+
+  // Abstand jedes Moduls (Mitte aus min und max) zum Median aller Module
+  var mids = mods.map(function(m){ return (m.min+m.max)/2; }).sort(function(p,q){return p-q;});
+  var med = mids.length%2 ? mids[(mids.length-1)/2] : (mids[mids.length/2-1]+mids[mids.length/2])/2;
+  var devs = mods.map(function(m){ return {m:m, d:((m.min+m.max)/2-med)*1000}; });
+  var scale = Math.max(10, Math.max.apply(null,devs.map(function(o){return Math.abs(o.d);}))*1.15);
+  var order = devs.slice().sort(function(p,q){ return meta.topModuleIndex===1 ? p.m.index-q.m.index : q.m.index-p.m.index; });
+  var b = live.inverter.battery, resting = Math.abs(b.current)<0.6 && b.restMinutes!==null && b.restMinutes>=20, dir = b.lastDirection;
+  var towerFull = b.soc>=99 && dir!=='discharge';   // Anzeige voll: Module nahe am Median gelten als voll, das ist genauer als die flache Kennlinie
+  devs.forEach(function(o){ o.est = !resting ? null : (towerFull && Math.abs(o.d)<5) ? {lo:97,hi:100} : socRange((o.m.min+o.m.max)/2, dir); });
+  $('devs').innerHTML = '<div class="devhead"><i></i><i></i><span>Spannung</span><span>Ladezustand</span></div>' + order.map(function(o){
+    var w = Math.abs(o.d)/scale*50, cls = Math.abs(o.d)<3 ? 'dev' : o.d<0 ? 'dev neg' : 'dev pos';
+    return '<div class="'+cls+'"><span class="n">Modul '+o.m.index+'</span><span class="t"><i style="'+(o.d<0?'right:50%':'left:50%')+';width:'+w+'%"></i></span>'+
+      '<span class="v">'+(o.d>0?'+':o.d<0?'\u2212':'')+nf(Math.abs(o.d),1)+' mV</span><span class="e">'+(o.est?fmtRange(o.est):'\u2013')+'</span></div>';
+  }).join('');
+  var worst = devs.slice().sort(function(p,q){return Math.abs(q.d)-Math.abs(p.d);})[0];
+  var box = $('estBox'), modKwh = (b.capacityKwh ? b.capacityKwh/mods.length : 3.2);
+  if(Math.abs(worst.d)<5){
+    box.style.display='none';
+    $('cmpHint').textContent = 'Alle Module liegen innerhalb von 5 mV beieinander. Bezugswert ist der Median aller Module ('+nf(med,4)+' V).';
+  } else if(!resting){
+    box.style.display='none';
+    $('cmpHint').textContent = 'Modul '+worst.m.index+' liegt '+nf(Math.abs(worst.d),1)+' mV '+(worst.d<0?'unter':'\u00fcber')+' dem Rest des Turms (Median '+nf(med,4)+' V). Eine Sch\u00e4tzung in Prozent gibt es erst nach 20 Minuten ohne Strom: unter Last verf\u00e4lscht der Innenwiderstand die Spannung'+(b.restMinutes!==null&&Math.abs(b.current)<0.6?' (bisher '+b.restMinutes+' Minuten Ruhe).':'.');
+  } else {
+    // Bezug: der Rest des Turms. Steht die Anzeige nach dem Laden auf 99 % oder mehr, gilt er als voll.
+    var ref = (b.soc>=99 && dir!=='discharge') ? {lo:97,hi:100} : socRange(med, dir), mine = worst.est;
+    var dLo = Math.max(0, worst.d<0 ? ref.lo-mine.hi : mine.lo-ref.hi), dHi = Math.max(dLo, worst.d<0 ? ref.hi-mine.lo : mine.hi-ref.lo);
+    var r5 = function(x){ return Math.round(x/5)*5; };
+    if(r5(dHi)<5){ box.style.display=''; box.innerHTML='<b>Alle Module sind gleichauf.</b> Aus den Ruhespannungen ergibt sich kein messbarer Unterschied im Ladezustand; die größte Abweichung hat Modul '+worst.m.index+' mit '+nf(Math.abs(worst.d),1)+' mV.'; }
+    else {
+      box.style.display='';
+      box.innerHTML = '<b>Modul '+worst.m.index+' steht bei '+fmtRange(mine).replace('etwa ','etwa ')+'</b>, der Rest des Turms bei '+fmtRange(ref)+'. '+
+      'Der '+(worst.d<0?'R\u00fcckstand':'Vorsprung')+' betr\u00e4gt damit grob <b>'+r5(dLo)+' bis '+r5(dHi)+' Prozentpunkte</b>, das sind '+
+      nf(dLo/100*modKwh,1)+' bis '+nf(dHi/100*modKwh,1)+' kWh oder '+nf(dLo/100*50,0)+' bis '+nf(dHi/100*50,0)+' Ah in diesem Modul.';
+    }
+    $('cmpHint').textContent = 'Gesch\u00e4tzt aus der Ruhespannung nach '+b.restMinutes+' Minuten ohne Strom ('+(dir==='charge'?'nach dem Laden':dir==='discharge'?'nach dem Entladen':'Richtung unbekannt')+'), mit einer allgemeinen LFP-Kennlinie und 4 mV Toleranz. Auf dem Plateau ist das nur eine Gr\u00f6\u00dfenordnung. Die belastbare Zahl liefert das Entladen: das Balancing-Protokoll h\u00e4lt fest, welches Modul zuerst leer ist und bei welcher Anzeige.';
+  }
+}
+
+/* ---------- Sammelschiene ---------- */
+function renderBus(inv, live){
+  var b = inv.battery, plant = live.plant||{pvPower:inv.pvPower,loadPower:inv.loadPower}, i2 = live.inverter2, n2 = meta.inverter2;
+  // dir: +1 = speist in die Schiene, -1 = nimmt von der Schiene
+  var feeders = [
+    {x:90, top:true,  name:n2?'Solar gesamt':'Solar', w:plant.pvPower, dir:plant.pvPower>20?1:0, col:'--pv',
+      sub:n2 ? meta.inverterName+' '+kw(inv.pvPower)+' + '+n2.name+' '+(i2?kw(i2.acPower):'aus') : 'MPPT '+nf(inv.mppt[0].v,0)+' V / '+nf(inv.mppt[1].v,0)+' V'},
+    {x:430, top:true,  name:'Batterie', w:b.power,      dir:b.power>0?-1:b.power<0?1:0, col:'--batt',
+      sub:b.power>0?'lädt':b.power<0?'entlädt':'Ruhe'},
+    {x:590, top:false, name:'Netz',     w:inv.gridPower, dir:inv.gridPower>20?1:inv.gridPower<-20?-1:0, col:'--grid',
+      sub:inv.gridPower>20?'Bezug':inv.gridPower<-20?'Einspeisung':'ausgeglichen'},
+    {x:820, top:false, name:'Haus',     w:plant.loadPower, dir:plant.loadPower>20?-1:0, col:'--house', sub:'Verbrauch'}
+  ];
+  var s = '<line class="bar" x1="40" y1="125" x2="960" y2="125"/>';
+  feeders.forEach(function(f){
+    var y1 = f.top?62:188, y2 = f.top?121:129;
+    // Pfad läuft immer vom Abgang zur Schiene; Animation "in" bewegt die Striche zur Schiene hin
+    var cls = f.dir===0 ? 'feed idle' : 'feed '+(f.dir>0?'in':'out');
+    s += '<path class="'+cls+'" style="stroke:'+(f.dir===0?'':'var('+f.col+')')+'" d="M'+f.x+' '+y1+' L'+f.x+' '+y2+'"/>';
+    var ty = f.top ? 24 : 214;
+    s += '<text class="lbl" x="'+(f.x-4)+'" y="'+ty+'" style="fill:var('+f.col+')">'+f.name+'</text>';
+    s += '<text class="val" x="'+(f.x+16)+'" y="'+(f.top?100:160)+'">'+kw(f.w)+'</text>';
+    s += '<text class="sub" x="'+(f.x-4)+'" y="'+(f.top?46:236)+'">'+esc(f.sub)+'</text>';
+  });
+  $('bus').innerHTML = s;
+}
+
+
+/* ---------- Stringwechselrichter ---------- */
+function renderInv2(d){
+  var list = d.meta.strings||[], live = d.live.strings||[], box = $('strPanels');
+  if(box.getAttribute('data-n')!==String(list.length)){
+    box.setAttribute('data-n',String(list.length));
+    box.innerHTML = list.map(function(x,n){ return '<section class="panel" aria-labelledby="h-str'+n+'"><h2 id="h-str'+n+'"></h2><dl class="facts" id="strFacts'+n+'"></dl><p class="hint" id="strHint'+n+'"></p></section>'; }).join('');
+  }
+  list.forEach(function(x,n){
+    var st = live[n]||{}, i2 = st.data;
+    $('h-str'+n).textContent = 'Stringwechselrichter, '+x.name;
+    if(i2) facts('strFacts'+n, [
+      ['AC-Leistung', kw(i2.acPower)], ['DC-Leistung', kw(i2.dcPower)],
+      ['Strang 1', nf(i2.mppt[0].v,0)+' V, '+nf(i2.mppt[0].a,1)+' A'], ['Strang 2', nf(i2.mppt[1].v,0)+' V, '+nf(i2.mppt[1].a,1)+' A'],
+      ['Ertrag heute', nf(i2.todayKwh,1)+' kWh'], ['Ertrag gesamt', nf(i2.totalKwh,0)+' kWh'],
+      ['Netzspannung L1 / L2 / L3', i2.phaseVoltage.map(function(v){return nf(v,0);}).join(' / ')+' V'],
+      ['Gerätetemperatur', nf(i2.inverterTemp,1)+' °C']
+    ]); else $('strFacts'+n).innerHTML = '';
+    $('strHint'+n).innerHTML = st.error && !i2
+      ? 'Keine Werte von '+esc(x.host)+': '+esc(st.error)+'. Nachts schaltet der Wechselrichter ab, dann ist das normal und er zählt mit 0 kW. Tagsüber prüfe die Angaben auf der Seite <a href="/anlage">Anlage</a>.'
+      : (x.addToHouseLoad ? 'Seine Leistung wird zum Hausverbrauch addiert, weil '+esc(meta.inverterName)+' diese Einspeisung nicht kennt und den Verbrauch sonst zu niedrig ausweist.' : '');
+  });
+}
+
+/* ---------- Kennwerte ---------- */
+function facts(id, rows){
+  $(id).innerHTML = rows.filter(function(r){return r[1]!==null&&r[1]!==undefined;}).map(function(r){ return '<div><dt>'+r[0]+'</dt><dd>'+r[1]+'</dd></div>'; }).join('');
+}
+function renderFacts(live){
+  var i = live.inverter, b = i.battery, s = live.settings||{}, c = live.cells;
+  facts('battFacts', [
+    ['Gesundheit (SOH)', nf(b.soh,0)+' %'],
+    ['Kapazität laut Wechselrichter', b.capacityKwh?nf(b.capacityKwh,1)+' kWh':null],
+    ['Zelltemperatur', c&&c.tempMin!==null ? nf(c.tempMin,1)+' bis '+nf(c.tempMax,1)+' °C' : null],
+    ['Vom BMS erlaubter Strom', b.bmsMaxCharge!==undefined ? 'laden '+nf(b.bmsMaxCharge,0)+' A, entladen '+nf(b.bmsMaxDischarge,0)+' A' : null],
+    ['Betriebsart', s.emsMode],
+    ['Zwangsmodus-Befehl', s.emsMode==='Zwangsmodus' ? s.forcedCommand+' mit '+kw(s.forcedPowerW) : null],
+    ['Reserve f\u00fcr Notstrom', s.backupReserve!==undefined ? nf(s.backupReserve,0)+' %' : null],
+    ['Zwangsladung nach Zeitfenster', s.timedCharge ? (s.timedCharge.enabled ? 'ein, '+s.timedCharge.from+' bis '+s.timedCharge.to : 'aus') : null],
+    ['SOC-Grenzen', s.minSoc!==undefined ? nf(s.minSoc,0)+' bis '+nf(s.maxSoc,0)+' %' : null],
+    ['Ladegrenze', s.maxChargeW!==undefined ? kw(s.maxChargeW) : null],
+    ['Entladegrenze', s.maxDischargeW!==undefined ? kw(s.maxDischargeW) : null]
+  ]);
+  var warn = $('battWarn'), tcg = s.timedCharge, msgs = [];
+  if(tcg && tcg.enabled) msgs.push('<b>Zwangsladung nach Zeitfenster ist aktiv</b> ('+tcg.from+' bis '+tcg.to+', Ziel '+tcg.targetSoc+' %). In diesem Fenster l\u00e4dt der Wechselrichter mit voller Leistung aus dem Netz und gibt die Batterie nicht zur Entladung frei.');
+  if(s.emsMode==='Zwangsmodus') msgs.push('<b>Zwangsmodus ist aktiv</b> (Befehl '+s.forcedCommand+'). Der Wechselrichter regelt nicht nach Eigenverbrauch.');
+  if(s.backupReserve!==undefined && s.backupReserve>=50) msgs.push('<b>Reserve f\u00fcr Notstrom steht auf '+nf(s.backupReserve,0)+' %.</b> Diesen Anteil h\u00e4lt der Wechselrichter zur\u00fcck: im Netzbetrieb entl\u00e4dt die Batterie nur bis dorthin.');
+  if(s.minSoc!==undefined && s.minSoc>=50) msgs.push('<b>Untere SOC-Grenze steht auf '+nf(s.minSoc,0)+' %.</b> Darunter wird nicht entladen.');
+  if(b.bmsMaxCharge!==undefined && b.bmsMaxCharge<10 && b.soc<90) msgs.push('<b>Das BMS erlaubt gerade nur '+nf(b.bmsMaxCharge,0)+' A Ladestrom.</b> Unterhalb von 90 % ist das eine Drosselung durch die Batterie selbst, nicht durch den Wechselrichter.');
+  if(b.bmsMaxDischarge!==undefined && b.bmsMaxDischarge<10 && b.soc>15) msgs.push('<b>Das BMS erlaubt gerade nur '+nf(b.bmsMaxDischarge,0)+' A Entladestrom.</b>');
+  warn.style.display = msgs.length ? '' : 'none'; warn.innerHTML = msgs.join('<br>');
+  facts('invFacts', [
+    ['AC-Leistung', kw(i.acPower)],
+    ['Strang 1', nf(i.mppt[0].v,0)+' V, '+nf(i.mppt[0].a,1)+' A'],
+    ['Strang 2', nf(i.mppt[1].v,0)+' V, '+nf(i.mppt[1].a,1)+' A'],
+    ['Netzspannung L1 / L2 / L3', i.phaseVoltage.map(function(v){return nf(v,0);}).join(' / ')+' V'],
+    ['Phasenstrom L1 / L2 / L3', i.phaseCurrent.map(function(v){return nf(v,1);}).join(' / ')+' A'],
+    ['Netzfrequenz', nf(i.frequency,2)+' Hz'],
+    ['Gerätetemperatur', nf(i.inverterTemp,1)+' °C']
+  ]);
+  var t = i.today, T = i.total, row = function(n,a,b){ return '<tr><td>'+n+'</td><td>'+nf(a,1)+'</td><td>'+nf(b,0)+'</td></tr>'; };
+  $('dayTable').innerHTML = '<tr><th></th><th>heute, kWh</th><th>gesamt, kWh</th></tr>'+
+    ((meta.strings||[]).length ? row('Solar '+esc(meta.inverterName),t.pv,T.pv)+(live.strings||[]).map(function(x){ return x.data?row('Solar '+esc(x.name),x.data.todayKwh,x.data.totalKwh):''; }).join('')+(live.inverter2?row('Solar gesamt',t.pv+live.inverter2.todayKwh,T.pv+live.inverter2.totalKwh):'') : row('Solarertrag',t.pv,T.pv))+row('Netzbezug',t.import,T.import)+row('Einspeisung',t.export,T.export)+
+    row('Batterie geladen',t.battCharge,T.battCharge)+row('Batterie entladen',t.battDischarge,T.battDischarge)+
+    '<tr><td>Eigenverbrauch'+((meta.strings||[]).length?', '+esc(meta.inverterName):'')+'</td><td>'+nf(t.selfConsumption,0)+' %</td><td></td></tr>';
+}
+
+/* ---------- Balancing-Protokoll ---------- */
+function renderBalancing(bal){
+  var days = Object.keys(bal).sort().reverse().slice(0,21);
+  if(!days.length){ $('balTable').innerHTML='<tr><td>Noch keine Einträge. Der erste erscheint, sobald Zellwerte gelesen wurden.</td></tr>'; return; }
+  var html = '<tr><th>Tag</th><th>Ladeende, höchste Zelle</th><th>niedrigste</th><th>in Modul</th><th>Spreizung</th><th>Trend</th><th>Entladeende, niedrigste</th><th>in Modul</th><th>zuerst leer</th></tr>';
+  days.forEach(function(d,idx){
+    var e = bal[d], t = e.top||{}, b = e.bottom||{}, prev = days[idx+1] && bal[days[idx+1]].top, trend = '';
+    if(prev && t.spreadMv!==undefined && t.cellMax>=3.45 && prev.cellMax>=3.45){
+      var diff = t.spreadMv-prev.spreadMv;
+      trend = '<span class="'+(diff<=0?'down':'up')+'">'+(diff>0?'+':'')+nf(diff,0)+' mV</span>';
+    }
+    html += '<tr><td>'+d.slice(8)+'.'+d.slice(5,7)+'.</td><td>'+nf(t.cellMax,4)+' V</td><td>'+nf(t.cellMin,4)+' V</td><td>'+(t.cellMinPos?t.cellMinPos.module:'–')+
+      '</td><td>'+nf(t.spreadMv,0)+' mV</td><td>'+trend+'</td><td>'+nf(b.cellMin,4)+' V</td><td>'+(b.cellMinPos?b.cellMinPos.module:'–')+'</td></tr>';
+  });
+  $('balTable').innerHTML = html;
+}
+
+/* ---------- Verläufe ---------- */
+function fmtTime(ms){ var d=new Date(ms), p=function(n){return n<10?'0'+n:n;}; return hours>30 ? p(d.getDate())+'.'+p(d.getMonth()+1)+'. '+p(d.getHours())+' Uhr' : p(d.getHours())+':'+p(d.getMinutes()); }
+function makeChart(id, title, yTitle, y2Title){
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily; Chart.defaults.font.size = 13;
+  var ink=css('--ink'), muted=css('--muted'), line=css('--line');
+  var scales = {
+    x:{type:'linear',ticks:{color:muted,autoSkip:true,maxRotation:0,callback:function(v){return fmtTime(v);},font:{size:13}},grid:{color:line},
+      afterBuildTicks:function(ax){ // Beschriftung auf runde Ortszeiten legen
+        var span=ax.max-ax.min, H=3600000, step = span<=1.5*H?10*60000 : span<=7*H?H : span<=30*H?3*H : span<=80*H?12*H : 24*H;
+        var d=new Date(ax.min); d.setHours(0,0,0,0); var t=d.getTime(), out=[];
+        while(t<ax.min) t+=step; for(;t<=ax.max;t+=step) out.push({value:t}); if(out.length>1) ax.ticks=out; }},
+    y:{title:{display:true,text:yTitle,color:muted,font:{size:13}},ticks:{color:muted,font:{size:13}},grid:{color:line}}
+  };
+  if(y2Title) scales.y2={position:'right',title:{display:true,text:y2Title,color:muted,font:{size:13}},ticks:{color:muted,font:{size:13}},grid:{drawOnChartArea:false},beginAtZero:true};
+  return new Chart($(id),{type:'line',plugins:[],data:{datasets:[]},options:{
+    animation:false,responsive:true,maintainAspectRatio:false,parsing:false,normalized:true,interaction:{mode:'nearest',axis:'x',intersect:false},
+    elements:{point:{radius:0},line:{borderWidth:1.8,tension:0}},
+    plugins:{title:{display:true,text:title,align:'start',color:ink,font:{size:16,weight:'600'},padding:{bottom:6}},
+      legend:{position:'bottom',labels:{color:ink,boxWidth:14,boxHeight:2,font:{size:13}}},
+      tooltip:{callbacks:{title:function(it){return fmtTime(it[0].parsed.x);}}}},
+    scales:scales}});
+}
+function ds(label,color,pts,extra){ var o={label:label,borderColor:color,backgroundColor:color,data:pts,spanGaps:false}; for(var k in (extra||{})) o[k]=extra[k]; return o; }
+function renderCharts(h){
+  if(!window.Chart){ $('chartHint').textContent='Die Diagramm-Bibliothek fehlt. Kopiere den Ordner public/vendor mit auf die NAS.'; return; }
+  $('chartHint').textContent = h.length<2 ? 'Noch zu wenige Messpunkte für einen Verlauf. Die Kurven füllen sich von selbst.' : '';
+  if(!charts.power){
+    charts.power = makeChart('cPower','Leistung, Batteriestrom und BMS-Freigabe','kW','A');
+    charts.soc = makeChart('cSoc','Ladezustand und Turmspannung','%','V');
+    charts.cells = makeChart('cCells','Höchste und niedrigste Zelle','V','mV');
+    charts.mods = makeChart('cMods','Niedrigste Zelle je Modul','V');
+    var so = charts.soc.options;
+    so.scales.y.min=0; so.scales.y.max=100; so.scales.y.ticks.stepSize=25; so.scales.y.ticks.callback=function(v){return v+' %';}; so.scales.y.title.display=false;
+    so.scales.y2.beginAtZero=false; so.scales.y2.title.display=false; so.scales.y2.ticks.maxTicksLimit=5; so.scales.y2.ticks.callback=function(v){return nf(v,0)+' V';};
+    so.interaction.mode='index';
+    so.plugins.tooltip.callbacks.label=function(it){ return it.dataset.label+': '+(it.dataset.yAxisID==='y2' ? nf(it.parsed.y,1)+' V' : nf(it.parsed.y,1)+' %'); };
+    so.plugins.legend.labels.generateLabels=function(chart){ var l=Chart.defaults.plugins.legend.labels.generateLabels(chart); l.push({text:'gestrichelt = Entladung',fillStyle:'transparent',strokeStyle:css('--batt'),lineWidth:2,lineDash:[6,4],fontColor:css('--ink')}); return l; };
+    charts.soc.config.plugins.push({id:'socExtras',afterDatasetsDraw:function(ch){
+      var a=ch.chartArea, c=ch.ctx, y=ch.scales.y, lim=ch.$limits||{}; if(!a) return;
+      c.save(); c.font='13px '+getComputedStyle(document.body).fontFamily; c.textBaseline='middle';
+      [['minSoc','untere Grenze'],['maxSoc','obere Grenze'],['backupReserve','Reserve Notstrom']].forEach(function(k){
+        var v=lim[k[0]]; if(v===undefined||v===null||v<=0.5||v>=99.5) return;
+        var py=y.getPixelForValue(v); c.strokeStyle=css('--muted'); c.setLineDash([2,4]); c.lineWidth=1; c.beginPath(); c.moveTo(a.left,py); c.lineTo(a.right,py); c.stroke();
+        c.setLineDash([]); c.fillStyle=css('--muted'); c.textAlign='left'; c.fillText(k[1]+' '+nf(v,0)+' %',a.left+6,py-9);
+      });
+      ch.data.datasets.forEach(function(d,i){ var meta=ch.getDatasetMeta(i), last=null; for(var j=d.data.length-1;j>=0;j--){ if(d.data[j].y!==null){ last=j; break; } }
+        if(last===null||meta.hidden) return; var pnt=meta.data[last]; if(!pnt) return;
+        var txt = d.yAxisID==='y2' ? nf(d.data[last].y,1)+' V' : nf(d.data[last].y,1)+' %', w=c.measureText(txt).width+10;
+        var px=Math.min(pnt.x, a.right)-w-6, py2=Math.max(a.top+10, Math.min(a.bottom-10, pnt.y+(d.yAxisID==='y2'?14:-14)));
+        c.fillStyle=css('--panel'); c.globalAlpha=.85; c.fillRect(px,py2-9,w,18); c.globalAlpha=1;
+        c.fillStyle=d.borderColor; c.textAlign='left'; c.fillText(txt,px+5,py2);
+        c.beginPath(); c.arc(pnt.x,pnt.y,3.2,0,Math.PI*2); c.fill();
+      });
+      c.restore();
+    }});
+  }
+  var gapMs = Math.max(300000, (h.length>2 ? (h[h.length-1].t-h[0].t)/h.length*6 : 0));
+  var series = function(fn){ var out=[]; for(var i=0;i<h.length;i++){ if(i && h[i].t-h[i-1].t>gapMs) out.push({x:h[i-1].t+1,y:null}); var v=fn(h[i]); out.push({x:h[i].t,y:(v===null||v===undefined||isNaN(v))?null:v}); } return out; };
+  var pt = function(key,f){ return series(function(s){ var v=s[key]; return (v===null||v===undefined)?null:(f?f(v):v); }); };
+  var k = function(v){ return v/1000; };
+  var has2 = !!(meta&&meta.inverter2), add2 = has2 && meta.inverter2.addToHouseLoad;
+  var pw = [ ds(has2?'Solar gesamt':'Solar',css('--pv'),series(function(s){return (s.pv+(s.pv2||0))/1000;}),{borderWidth:2.2}) ];
+  if(has2) pw.push(ds('davon '+meta.inverter2.name,css('--pv'),series(function(s){return s.pv2===undefined?null:s.pv2/1000;}),{borderWidth:1.2,borderDash:[5,4]}));
+  pw.push(ds('Haus',css('--house'),series(function(s){return (s.load+(s.pv2h!==undefined?s.pv2h:(add2?(s.pv2||0):0)))/1000;})), ds('Netz (Bezug positiv)',css('--grid'),pt('grid',k)), ds('Batterie (Laden positiv)',css('--batt'),pt('bp',k)));
+  if(h.some(function(x){return x.bmc!==undefined;})){
+    pw.push(ds('Batteriestrom (A)',css('--batt'),series(function(x){return Math.abs(x.ba);}),{yAxisID:'y2',borderWidth:1,borderDash:[2,3]}));
+    pw.push(ds('BMS erlaubt zum Laden (A)',css('--alert'),series(function(x){return x.bmc;}),{yAxisID:'y2',borderWidth:1.6,stepped:true}));
+  }
+  charts.power.data.datasets = pw;
+  var socCol = css('--batt'), voltCol = css('--house');
+  var sc = charts.soc, area = sc.chartArea, grad = socCol+'33';
+  if(area){ grad = sc.ctx.createLinearGradient(0,area.top,0,area.bottom); grad.addColorStop(0,socCol+'66'); grad.addColorStop(1,socCol+'05'); }
+  var bpAt = {}; h.forEach(function(s){ bpAt[s.t]=s.bp; });
+  sc.data.datasets = [
+    ds('Ladezustand',socCol,pt('soc'),{fill:'origin',backgroundColor:grad,borderWidth:2.4,tension:0.25,cubicInterpolationMode:'monotone',order:2,
+      segment:{borderDash:function(c){ var bp=bpAt[c.p1.parsed.x]; return bp<-50 ? [6,4] : undefined; }}}),
+    ds('Turmspannung',voltCol,pt('bv'),{yAxisID:'y2',borderWidth:1.3,tension:0.2,order:1})
+  ];
+  // Spannungsachse: nie feiner als 20 V Spanne, damit Rauschen im Zehntelvolt-Bereich nicht wie ein Ausschlag aussieht
+  var volts = h.map(function(s){return s.bv;}).filter(function(v){return v>0;});
+  if(volts.length){ var vmin=Math.min.apply(null,volts), vmax=Math.max.apply(null,volts), mid=(vmin+vmax)/2, half=Math.max((vmax-vmin)/2*1.15,10);
+    sc.options.scales.y2.min=Math.floor((mid-half)/5)*5; sc.options.scales.y2.max=Math.ceil((mid+half)/5)*5; }
+  sc.$limits = lastSettings;
+  charts.cells.data.datasets = [ ds('höchste Zelle',css('--hi'),pt('cmax')), ds('niedrigste Zelle',css('--lo'),pt('cmin')),
+    ds('Spreizung',css('--muted'),series(function(s){return (s.cmax&&s.cmin)?Math.round((s.cmax-s.cmin)*10000)/10:null;}),{yAxisID:'y2',borderDash:[4,3],borderWidth:1.2}) ];
+  var n = meta?meta.moduleCount:8, shades=[];
+  for(var m=0;m<n;m++){ (function(m){
+    var note = meta&&meta.moduleNotes&&meta.moduleNotes[m+1];
+    shades.push(ds('Modul '+(m+1),note?css('--lo'):css('--muted'),series(function(s){return s.mmin?s.mmin[m]:null;}),{borderWidth:note?2.2:1}));
+  })(m); }
+  charts.mods.data.datasets = shades;
+  charts.mods.options.plugins.legend.labels.filter = function(item){ return meta&&meta.moduleNotes&&meta.moduleNotes[item.datasetIndex+1]; };
+  Object.keys(charts).forEach(function(c){ var x=charts[c].options.scales.x; x.min=h.length?h[0].t:undefined; x.max=h.length?h[h.length-1].t:undefined; charts[c].update(); });
+}
+
+
+/* ---------- Laden ---------- */
+function get(url){ return fetch(url,{cache:'no-store'}).then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }); }
+function banner(msg){ var b=$('banner'); b.className = msg?'banner on':'banner'; b.innerHTML = msg||''; }
+
+function refreshLive(){
+  get('api/live').then(function(d){
+    meta = d.meta; $('plant').textContent = meta.plantName;
+    var wb=$('winetBtn'), paused=meta.winetPausedUntil&&meta.winetPausedUntil>d.now; wb.className=paused?'wbtn on':'wbtn'; wb.textContent=paused?'WiNet-S frei bis '+new Date(meta.winetPausedUntil).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+', jetzt wieder nutzen':'WiNet-S freigeben'; wb.setAttribute('data-paused',paused?'1':'0'); document.title = meta.plantName+' – Monitor';
+    var age = d.lastOk ? Math.round((d.now-d.lastOk)/1000) : null, stale = age===null || age > meta.pollSeconds*4;
+    $('dot').className = stale?'dot off':'dot';
+    $('stamp').textContent = d.lastOk ? 'letzte Messung '+new Date(d.lastOk).toLocaleTimeString('de-DE')+(stale?' (vor '+age+' s)':'') : '';
+    if(d.error) banner('<b>Der Wechselrichter antwortet nicht</b> ('+esc(meta.inverter)+'): '+esc(d.error)+'. Prüfe die Angaben auf der Seite <a href="/anlage">Anlage</a>, ob Modbus TCP am Gerät freigegeben ist und ob ein anderes Programm die Verbindung belegt. Der WiNet-S bedient nur wenige Clients gleichzeitig.');
+    else banner('');
+    if(!d.live){ $('sysState').textContent = d.error?'keine Verbindung':'warte auf erste Messung'; return; }
+    $('sysState').textContent = d.live.inverter.systemState;
+    $('emsState').textContent = d.live.settings&&d.live.settings.emsMode ? ' im Modus '+d.live.settings.emsMode : '';
+    lastSettings = d.live.settings||{}; renderTower(d.live); renderCompare(d.live); renderBus(d.live.inverter, d.live); renderInv2(d); renderFacts(d.live);
+    $('cellHint').textContent = !d.batteryError ? '' : meta.cellSource==='winet'
+      ? 'Die Zellwerte kommen gerade nicht vom WiNet-S ('+meta.battery+'): '+d.batteryError+'. Prüfe Benutzer und Passwort des WiNet-S auf der Seite Anlage. Der WiNet-S lässt oft nur eine Anmeldung gleichzeitig zu: bist du im Browser eingeloggt, kann das den Monitor abmelden. Er versucht es von selbst wieder.'
+      : 'Die Zellwerte der Batterie sind nicht lesbar ('+meta.battery+'): '+d.batteryError+'.';
+  }).catch(function(e){ $('dot').className='dot off'; banner('<b>Der Monitor-Dienst auf der NAS antwortet nicht.</b> '+esc(e.message)+'. Läuft server.js noch?'); });
+}
+function refreshSlow(){
+  get('api/history?hours='+hours+'&points=720').then(renderCharts).catch(function(){});
+  get('api/balancing').then(renderBalancing).catch(function(){});
+}
+Array.prototype.forEach.call(document.querySelectorAll('.seg button'),function(btn){
+  btn.addEventListener('click',function(){
+    hours = +btn.getAttribute('data-h');
+    Array.prototype.forEach.call(document.querySelectorAll('.seg button'),function(o){ o.setAttribute('aria-pressed', o===btn?'true':'false'); });
+    refreshSlow();
+  });
+});
+$('winetBtn').onclick=function(){ var on=this.getAttribute('data-paused')==='1'; fetch('api/winet-pause',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({minutes:on?0:20})}).then(function(r){return r.json();}).then(function(j){ if(j.error) window.alert(j.error); refreshLive(); }).catch(function(){}); };
+refreshLive(); setInterval(refreshLive,5000);
+setTimeout(refreshSlow,400); setInterval(refreshSlow,60000);
+})();
+</script>
+</body>
+</html>

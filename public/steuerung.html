@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<!--
+  Sungrow Steuerung – (C) by Elric M.
+  Nur für die private Nutzung zu Test- und Lernzwecken. Kommerzielle Verwendung, Verwendung im Geschäftsbetrieb und
+  Weiterverkauf untersagt. Benutzung auf eigene Gefahr, ohne Gewährleistung oder Garantie. Siehe LICENSE und HANDBUCH.md.
+-->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sungrow Steuerung</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#E7EAED;--panel:#F8F9FA;--ink:#17202A;--muted:#5A6673;--line:#C9D0D7;--track:#DDE2E7;--pv:#C98A00;--grid:#2A5FC4;--batt:#0A8575;--alert:#C2352B;--lo:#2A5FC4;--edit:#FFF3D6}
+@media (prefers-color-scheme:dark){:root{--bg:#141A21;--panel:#1C242D;--ink:#E6EAEE;--muted:#97A3AF;--line:#34404C;--track:#2A343F;--pv:#E5A823;--grid:#6F9BEF;--batt:#35B9A6;--alert:#EF6A5F;--lo:#6F9BEF;--edit:#3A3016}}
+*{box-sizing:border-box} html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Barlow Semi Condensed",Bahnschrift,"DIN Alternate","Arial Narrow",sans-serif;font-size:17px;line-height:1.35;font-variant-numeric:tabular-nums}
+.wrap{max-width:1500px;margin:0 auto;padding:20px 24px 56px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 28px;border-bottom:2px solid var(--ink)}
+h1{font-size:30px;font-weight:600;margin:0 0 12px} h2{font-size:21px;font-weight:600;margin:0} h3{font-size:16px;font-weight:600;margin:0 0 8px}
+nav{display:flex;gap:4px;margin-left:8px}
+nav button{font:inherit;font-size:18px;padding:9px 20px;border:2px solid var(--ink);border-bottom:0;background:transparent;color:var(--ink);cursor:pointer;margin-bottom:-2px}
+nav button[aria-selected="true"]{background:var(--ink);color:var(--panel)}
+nav a.navlink{font-size:18px;padding:9px 20px;border:2px solid var(--ink);border-bottom:0;color:var(--ink);text-decoration:none;margin-bottom:-2px;display:inline-block}
+nav a.navlink:hover,nav a.navlink:focus-visible{background:var(--track)}
+nav button.live::after{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--pv);margin-left:9px}
+header .right{margin-left:auto;padding-bottom:12px;display:flex;gap:18px;align-items:baseline;color:var(--muted)}
+header a{color:var(--grid)}
+header .copy{white-space:nowrap;font-size:15px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--batt);margin-right:8px}.dot.off{background:var(--alert)}
+.banner{display:none;margin-top:14px;padding:12px 16px;border-left:5px solid var(--alert);background:var(--panel)}.banner.on{display:block}
+.hintbox{margin-top:14px;padding:11px 16px;border-left:5px solid var(--alert);background:var(--panel)} .hintbox.note{border-left-color:var(--pv)}
+.panel{background:var(--panel);border:1px solid var(--line);padding:20px 22px;min-width:0;margin-top:20px}
+.panel.changed{border-color:var(--pv);box-shadow:inset 5px 0 0 var(--pv)}
+.phead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px 16px;margin-bottom:16px}
+.phead p{margin:4px 0 0;color:var(--muted);font-size:15px;max-width:72ch}
+.acts{display:flex;gap:8px;align-items:center}
+button.b{font:inherit;font-size:16px;padding:7px 16px;border:2px solid var(--ink);background:var(--panel);color:var(--ink);cursor:pointer}
+button.b.pri{background:var(--ink);color:var(--panel)} button.b.danger{border-color:var(--alert);color:var(--alert)}
+button.b[disabled]{opacity:.35;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--grid);outline-offset:2px}
+.res{font-size:15px;margin:10px 0 0} .res .ok{color:var(--batt)} .res .bad{color:var(--alert)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:20px} @media (max-width:950px){.two{grid-template-columns:1fr}}
+.badge{display:inline-block;font-size:12px;font-weight:500;padding:1px 7px;border:1px solid var(--muted);color:var(--muted);margin-left:8px;vertical-align:2px;white-space:nowrap}
+.badge.ok{border-color:var(--batt);color:var(--batt)}
+
+/* Auswahlkarten */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.card{border:2px solid var(--line);padding:12px 14px;cursor:pointer;background:var(--panel);text-align:left;font:inherit;color:var(--ink)}
+.card b{display:block;font-size:19px;font-weight:600} .card span{display:block;color:var(--muted);font-size:14px;margin-top:2px}
+.card[aria-pressed="true"]{border-color:var(--ink);background:var(--bg)} .card.dev{box-shadow:inset 0 -4px 0 var(--batt)}
+.sub{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+
+/* Regler */
+.field{margin:0 0 18px} .field:last-child{margin-bottom:0}
+.field label{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:4px}
+.field .val{font-size:22px;font-weight:500;white-space:nowrap}
+.field .val input{font:inherit;width:86px;text-align:right;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:2px 6px}
+.field.edited .val input{background:var(--edit);border-color:var(--pv)}
+.field small{display:block;color:var(--muted);font-size:14px;min-height:19px}
+input[type=range]{width:100%;accent-color:var(--ink);margin:2px 0 0}
+.field.edited input[type=range]{accent-color:var(--pv)}
+
+/* Batteriebalken */
+.socbar{position:relative;height:54px;border:2px solid var(--ink);background:var(--batt);margin:4px 0 26px}
+.socbar::after{content:"";position:absolute;right:-10px;top:14px;width:8px;height:22px;background:var(--ink)}
+.socbar .z{position:absolute;top:0;bottom:0}
+.socbar .lock{background:repeating-linear-gradient(135deg,var(--track),var(--track) 6px,var(--panel) 6px,var(--panel) 12px)}
+.socbar .rsv{background:var(--pv);opacity:.85}
+.socbar .now{position:absolute;top:-8px;bottom:-8px;border-left:3px solid var(--ink)}
+.socbar .now b{position:absolute;top:-22px;left:-30px;width:60px;text-align:center;font-size:15px;font-weight:600}
+.socbar .tk{position:absolute;bottom:-22px;font-size:13px;color:var(--muted);transform:translateX(-50%)}
+.leg{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;color:var(--muted);margin-bottom:18px}
+.leg span::before{content:"";display:inline-block;width:12px;height:12px;margin-right:6px;transform:translateY(1px);background:var(--batt)}
+.leg .l2::before{background:var(--pv)} .leg .l3::before{background:repeating-linear-gradient(135deg,var(--track),var(--track) 3px,var(--panel) 3px,var(--panel) 6px);border:1px solid var(--line)}
+
+/* Tagesleiste */
+.day{position:relative;height:40px;background:var(--track);margin:6px 0 24px}
+.day .w{position:absolute;top:0;bottom:0;background:var(--grid);opacity:.9;color:#fff;font-size:13px;padding:2px 6px;overflow:hidden;white-space:nowrap}
+.day .w.w2{background:var(--batt)} .day.off .w{opacity:.3}
+.day .tk{position:absolute;bottom:-20px;font-size:13px;color:var(--muted);transform:translateX(-50%)}
+.day .tk::before{content:"";position:absolute;left:50%;top:-44px;height:40px;border-left:1px solid var(--panel);opacity:.7}
+.day .nowl{position:absolute;top:-5px;bottom:-5px;border-left:2px solid var(--alert)}
+.win{display:grid;grid-template-columns:auto 1fr 1fr 1.6fr;gap:10px 16px;align-items:end;margin-bottom:12px}
+.win .t{font-weight:600;padding-bottom:6px} .win label{display:block;font-size:14px;color:var(--muted)}
+.win input[type=text]{font:inherit;font-size:20px;width:100%;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:3px 8px}
+.win .edited input[type=text]{background:var(--edit);border-color:var(--pv)}
+@media (max-width:700px){.win{grid-template-columns:1fr 1fr}}
+.switch{display:inline-flex;border:2px solid var(--ink)} .switch button{font:inherit;font-size:17px;padding:6px 18px;border:0;background:none;color:var(--ink);cursor:pointer}
+.switch button[aria-pressed="true"]{background:var(--ink);color:var(--panel)} .switch button.dev{box-shadow:inset 0 -4px 0 var(--batt)}
+.log div{padding:4px 0;border-bottom:1px solid var(--line);font-size:15px} .log b{font-weight:500;margin-right:10px} .log .bad{color:var(--alert)}
+.hint{color:var(--muted);font-size:15px;margin:10px 0 0;max-width:72ch}
+
+/* Matching */
+.grid{display:grid;grid-template-columns:310px 1fr;gap:20px;align-items:start} @media (max-width:900px){.grid{grid-template-columns:1fr}}
+.panel.main{border:2px solid var(--ink)}
+ol{margin:0;padding:0;list-style:none;counter-reset:st}
+ol li{counter-increment:st;position:relative;padding:6px 0 6px 38px;color:var(--muted);font-size:16px;line-height:1.25}
+ol li::before{content:counter(st);position:absolute;left:0;top:5px;width:24px;height:24px;border:1px solid var(--muted);text-align:center;line-height:23px;font-size:14px}
+ol li.done{color:var(--ink)} ol li.done::before{content:"\2713";background:var(--batt);border-color:var(--batt);color:var(--panel)}
+ol li.now{color:var(--ink);font-weight:600} ol li.now::before{background:var(--ink);border-color:var(--ink);color:var(--panel)}
+ol li.user::after{content:" \2013 du";font-weight:400;color:var(--muted)}
+.msg{font-size:22px;line-height:1.35;margin:0 0 14px;max-width:68ch} .msg.you{border-left:6px solid var(--pv);padding-left:14px}
+.mwarn{margin:0 0 14px;padding:9px 14px;border-left:5px solid var(--alert);background:var(--bg);max-width:68ch}
+.vals{display:flex;flex-wrap:wrap;gap:12px 32px;margin:0 0 18px} .vals dt{font-size:14px;color:var(--muted)} .vals dd{margin:0;font-size:23px;font-weight:500}
+.btns{display:flex;flex-wrap:wrap;gap:10px}
+.btns button{font:inherit;font-size:17px;padding:9px 20px;border:2px solid var(--ink);background:var(--panel);color:var(--ink);cursor:pointer}
+.btns button.pri{background:var(--ink);color:var(--panel)} .btns button.danger{border-color:var(--alert);color:var(--alert)}
+.mod{display:grid;grid-template-columns:96px 1fr 110px;align-items:center;gap:0 12px;height:30px;font-size:15px}
+.mod .n{font-weight:600} .mod .n span{font-weight:400;color:var(--muted)}
+.mod .t{position:relative;height:12px;background:var(--track)} .mod .t i{position:absolute;top:0;bottom:0;background:var(--batt);min-width:4px}
+.mod.tg .t i{background:var(--lo)} .mod .t em{position:absolute;top:-5px;bottom:-5px;border-left:2px solid var(--alert)} .mod .v{text-align:right}
+.mlog{max-height:340px;overflow:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Sungrow Steuerung</h1>
+    <nav role="tablist" aria-label="Bereiche">
+      <a class="navlink" href="/">Monitor</a>
+      <button role="tab" id="tabS" aria-selected="true" data-tab="settings">Einstellungen</button>
+      <button role="tab" id="tabM" aria-selected="false" data-tab="matching">Matching</button>
+      <a class="navlink" href="/anlage">Anlage</a>
+    </nav>
+    <div class="right"><span><span class="dot" id="dot"></span><span id="topStatus"></span></span><span class="copy">(C) by Elric M.</span></div>
+  </header>
+
+  <!-- ===================== Einstellungen ===================== -->
+  <main id="viewS">
+    <div class="banner" id="sBanner" role="alert"></div>
+    <div id="hints"></div>
+
+    <section class="panel" id="pMode" aria-labelledby="hMode">
+      <div class="phead"><div><h2 id="hMode">Betriebsart</h2><p>Eigenverbrauch ist der Alltag. Im Zwangsmodus folgt die Batterie nur dem Befehl darunter, egal was Haus und Sonne tun.</p></div>
+        <div class="acts"><button class="b" data-discard="mode" disabled>Verwerfen</button><button class="b pri" data-apply="mode" disabled>Übernehmen</button></div></div>
+      <div class="cards" id="modeCards"></div>
+      <div class="sub" id="forcedBox">
+        <h3>Befehl im Zwangsmodus</h3>
+        <div class="cards" id="cmdCards" style="margin-bottom:16px"></div>
+        <div class="field" id="f_forcedPower"></div>
+      </div>
+      <p class="res" id="rMode"></p>
+    </section>
+
+    <div class="two">
+      <section class="panel" id="pSoc" aria-labelledby="hSoc">
+        <div class="phead"><div><h2 id="hSoc">Ladezustand</h2><p>Welchen Teil der Batterie der Wechselrichter nutzen darf.</p></div>
+          <div class="acts"><button class="b" data-discard="soc" disabled>Verwerfen</button><button class="b pri" data-apply="soc" disabled>Übernehmen</button></div></div>
+        <div class="socbar" id="socbar"></div>
+        <div class="leg"><span>nutzbar</span><span class="l2">Reserve für Notstrom</span><span class="l3">gesperrt</span></div>
+        <div class="field" id="f_minSoc"></div><div class="field" id="f_backupReserve"></div><div class="field" id="f_maxSoc"></div>
+        <p class="res" id="rSoc"></p>
+      </section>
+
+      <section class="panel" id="pPower" aria-labelledby="hPower">
+        <div class="phead"><div><h2 id="hPower">Leistungsgrenzen der Batterie</h2><p>Gelten im Eigenverbrauch. Die Obergrenze ist die Nennleistung des Wechselrichters (Seite Anlage).</p></div>
+          <div class="acts"><button class="b" data-discard="power" disabled>Verwerfen</button><button class="b pri" data-apply="power" disabled>Übernehmen</button></div></div>
+        <div class="field" id="f_maxCharge"></div><div class="field" id="f_maxDischarge"></div>
+        <p class="res" id="rPower"></p>
+        <div class="sub"><h3>Einspeisebegrenzung <span class="badge">ungeprüft</span></h3>
+          <p class="hint" style="margin:0 0 12px">Aus der Sungrow-Registerliste, beim Entwickeln nie geschrieben. Eine falsche Begrenzung kostet Ertrag.</p>
+          <div class="switch" id="sw_exportEnable" style="margin-bottom:14px"></div>
+          <div class="field" id="f_exportLimit"></div>
+          <div class="acts"><button class="b" data-discard="export" disabled>Verwerfen</button><button class="b pri" data-apply="export" disabled>Übernehmen</button></div>
+          <p class="res" id="rExport"></p></div>
+      </section>
+    </div>
+
+    <section class="panel" id="pTimed" aria-labelledby="hTimed">
+      <div class="phead"><div><h2 id="hTimed">Zwangsladung nach Zeitfenster</h2><p>Im Fenster lädt der Wechselrichter mit voller Leistung aus dem Netz bis zum Ziel und hält die Batterie dort. Außerhalb gilt die Betriebsart.</p></div>
+        <div class="acts"><button class="b" data-discard="timed" disabled>Verwerfen</button><button class="b pri" data-apply="timed" disabled>Übernehmen</button></div></div>
+      <div class="switch" id="sw_tcEnable"></div>
+      <div class="day" id="day" style="margin-top:18px"></div>
+      <div class="win" id="win1"></div><div class="win" id="win2"></div>
+      <p class="res" id="rTimed"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="hLog">
+      <div class="phead"><div><h2 id="hLog">Änderungsprotokoll</h2></div><div class="acts"><span class="hint" id="readAt" style="margin:0"></span><button class="b" id="reload">Neu einlesen</button></div></div>
+      <div class="log" id="chLog"></div>
+      <p class="hint">Jede Änderung wird geschrieben, sofort zurückgelesen und hier festgehalten. Die Batterie selbst hat keine eigenen Einstellregister: alles, was sie betrifft, wird am Wechselrichter eingestellt.</p>
+    </section>
+  </main>
+
+  <!-- ===================== Matching ===================== -->
+  <main id="viewM" style="display:none">
+    <div class="banner" id="mBanner" role="alert"></div>
+    <p class="hint" id="mStatus" style="margin-top:14px"></p>
+    <div class="grid" style="margin-top:6px">
+      <section class="panel" aria-labelledby="h-steps"><h2 id="h-steps" style="margin-bottom:12px">Ablauf</h2><ol id="steps"></ol></section>
+      <div>
+        <section class="panel main" aria-live="polite"><p class="msg" id="msg"></p><p class="mwarn" id="warn" style="display:none"></p><dl class="vals" id="vals"></dl><div class="btns" id="btns"></div></section>
+        <section class="panel" aria-labelledby="h-mods"><h2 id="h-mods" style="margin-bottom:12px">Niedrigste Zelle je Modul</h2><div id="mods"></div><p class="hint" id="modHint"></p></section>
+        <section class="panel" aria-labelledby="h-log"><h2 id="h-log" style="margin-bottom:12px">Protokoll</h2><div class="log mlog" id="log"></div></section>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+(function(){
+'use strict';
+var $=function(id){return document.getElementById(id);};
+var nf=function(v,d){return v===null||v===undefined||isNaN(v)?'\u2013':Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d});};
+var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});};
+var tab='settings', matchingActive=false;
+function showTab(t){ tab=t; try{ history.replaceState(null,'',t==='matching'?'/matching':'/einstellungen'); }catch(e){} $('viewS').style.display=t==='settings'?'':'none'; $('viewM').style.display=t==='matching'?'':'none'; $('tabS').setAttribute('aria-selected',t==='settings'); $('tabM').setAttribute('aria-selected',t==='matching'); }
+$('tabS').onclick=function(){showTab('settings');}; $('tabM').onclick=function(){showTab('matching');};
+
+/* ================= Einstellungen ================= */
+var dev={}, edit={}, defs={}, live=null, GROUPS={mode:['emsMode','forcedCmd','forcedPower'],soc:['minSoc','backupReserve','maxSoc'],power:['maxCharge','maxDischarge'],export:['exportEnable','exportLimit'],
+  timed:['tcEnable','tc1StartH','tc1StartM','tc1EndH','tc1EndM','tc1Target','tc2StartH','tc2StartM','tc2EndH','tc2EndM','tc2Target']};
+var RES={mode:'rMode',soc:'rSoc',power:'rPower',export:'rExport',timed:'rTimed'};
+function cur(id){ return edit[id]!==undefined?edit[id]:dev[id]; }
+function setEdit(id,v){ if(v===dev[id]||(typeof v==='number'&&Math.abs(v-dev[id])<1e-9)) delete edit[id]; else edit[id]=v; renderSettings(); }
+function badge(id){ var d=defs[id]; return d?('<span class="badge'+(d.verified?' ok':'')+'">'+(d.verified?'geprüft':'ungeprüft')+'</span>'):''; }
+function fmtUnit(id,v){ var d=defs[id]; if(v===undefined) return 'nicht lesbar'; return d.unit==='W'?nf(v/1000,1)+' kW':nf(v,0)+' '+d.unit; }
+
+function slider(id,opts){
+  var d=defs[id], box=$('f_'+id); if(!d||!box) return;
+  var v=cur(id), has=dev[id]!==undefined, ed=edit[id]!==undefined, kw=d.unit==='W';
+  box.className='field'+(ed?' edited':'');
+  var key=id+'|'+has; if(box.getAttribute('data-k')!==key){
+    box.setAttribute('data-k',key);
+    box.innerHTML='<label for="n_'+id+'"><span>'+esc(opts&&opts.label||d.label)+badge(id)+'</span><span class="val"><input id="n_'+id+'" type="number" inputmode="decimal" step="'+(kw?0.1:d.step)+'" min="'+(kw?d.min/1000:d.min)+'" max="'+(kw?d.max/1000:d.max)+'"'+(has?'':' disabled')+'> '+(kw?'kW':d.unit)+'</span></label>'+
+      '<input id="r_'+id+'" type="range" aria-label="'+esc(d.label)+'" min="'+d.min+'" max="'+d.max+'" step="'+d.step+'"'+(has?'':' disabled')+'><small id="s_'+id+'"></small>';
+    $('r_'+id).oninput=function(){ setEdit(id,Number(this.value)); };
+    $('n_'+id).onchange=function(){ var x=Number(this.value)*(kw?1000:1); if(isFinite(x)) setEdit(id,Math.max(d.min,Math.min(d.max,Math.round(x/d.step)*d.step))); };
+  }
+  if(has){ $('r_'+id).value=v; if(document.activeElement!==$('n_'+id)) $('n_'+id).value=kw?(v/1000).toFixed(1):v; }
+  $('s_'+id).textContent = !has?'Dieses Register ließ sich nicht lesen.':ed?'im Gerät steht '+fmtUnit(id,dev[id]):(opts&&opts.note||'');
+}
+function cards(boxId,id,items){
+  $(boxId).innerHTML=items.map(function(it){ return '<button type="button" class="card'+(dev[id]===it[0]?' dev':'')+'" aria-pressed="'+(cur(id)===it[0])+'" data-v="'+it[0]+'"><b>'+it[1]+'</b><span>'+it[2]+'</span></button>'; }).join('');
+  Array.prototype.forEach.call($(boxId).querySelectorAll('button'),function(b){ b.onclick=function(){ setEdit(id,Number(b.getAttribute('data-v'))); }; });
+}
+function sw(boxId,id){
+  $(boxId).innerHTML=[[0xaa,'ein'],[0x55,'aus']].map(function(o){ return '<button type="button" class="'+(dev[id]===o[0]?'dev':'')+'" aria-pressed="'+(cur(id)===o[0])+'" data-v="'+o[0]+'"'+(dev[id]===undefined?' disabled':'')+'>'+o[1]+'</button>'; }).join('');
+  Array.prototype.forEach.call($(boxId).querySelectorAll('button'),function(b){ b.onclick=function(){ setEdit(id,Number(b.getAttribute('data-v'))); }; });
+}
+function hm(h,m){ return (h<10?'0':'')+h+':'+(m<10?'0':'')+m; }
+function win(n){
+  var p='tc'+n, box=$('win'+n), ids=[p+'StartH',p+'StartM',p+'EndH',p+'EndM'], has=ids.every(function(i){return dev[i]!==undefined;});
+  var key=n+'|'+has; if(box.getAttribute('data-k')!==key){ box.setAttribute('data-k',key);
+    box.innerHTML='<div class="t">Fenster '+n+'</div><div id="ws'+n+'"><label for="ts'+n+'">Beginn</label><input id="ts'+n+'" type="text" inputmode="numeric" placeholder="00:00" maxlength="5"'+(has?'':' disabled')+'></div>'+
+      '<div id="we'+n+'"><label for="te'+n+'">Ende (bis 24:00)</label><input id="te'+n+'" type="text" inputmode="numeric" placeholder="24:00" maxlength="5"'+(has?'':' disabled')+'></div><div class="field" id="f_'+p+'Target" style="margin:0"></div>';
+    var parse=function(el,hId,mId){ var m=/^(\d{1,2}):(\d{2})$/.exec(el.value.trim()); if(!m){ renderSettings(); return; } var h=Math.min(24,+m[1]), mi=h===24?0:Math.min(59,+m[2]); setEdit(hId,h); setEdit(mId,mi); };
+    $('ts'+n).onchange=function(){ parse(this,p+'StartH',p+'StartM'); }; $('te'+n).onchange=function(){ parse(this,p+'EndH',p+'EndM'); };
+  }
+  if(has){ if(document.activeElement!==$('ts'+n)) $('ts'+n).value=hm(cur(p+'StartH'),cur(p+'StartM')); if(document.activeElement!==$('te'+n)) $('te'+n).value=hm(cur(p+'EndH'),cur(p+'EndM')); }
+  $('ws'+n).className=(edit[p+'StartH']!==undefined||edit[p+'StartM']!==undefined)?'edited':''; $('we'+n).className=(edit[p+'EndH']!==undefined||edit[p+'EndM']!==undefined)?'edited':'';
+  slider(p+'Target',{label:'Ziel-Ladezustand'});
+}
+function renderSettings(){
+  if(!Object.keys(defs).length) return;
+  cards('modeCards','emsMode',[[0,'Eigenverbrauch','Sonne zuerst ins Haus, Rest in die Batterie'],[2,'Zwangsmodus','Batterie folgt dem Befehl darunter'],[3,'Externes EMS','Steuerung von außen, etwa evcc']]);
+  $('forcedBox').style.display = cur('emsMode')===2||dev.emsMode===2 ? '' : 'none';
+  cards('cmdCards','forcedCmd',[[0xaa,'Laden','mit der Leistung unten, auch aus dem Netz'],[0xbb,'Entladen','mit der Leistung unten, Überschuss geht ins Netz'],[0xcc,'Stopp','Batterie ruht']]);
+  slider('forcedPower'); slider('minSoc',{note:'Darunter entlädt der Wechselrichter nicht, auch nicht im Zwangsmodus.'}); slider('backupReserve',{note:'Dieser Anteil bleibt im Netzbetrieb für den Stromausfall stehen.'}); slider('maxSoc');
+  slider('maxCharge'); slider('maxDischarge'); slider('exportLimit'); sw('sw_exportEnable','exportEnable'); sw('sw_tcEnable','tcEnable'); win(1); win(2);
+  // Batteriebalken
+  var mn=cur('minSoc')||0, rs=Math.max(cur('backupReserve')||0,mn), mx=cur('maxSoc')===undefined?100:cur('maxSoc'), h='';
+  h+='<div class="z lock" style="left:0;width:'+mn+'%"></div>'; if(rs>mn) h+='<div class="z rsv" style="left:'+mn+'%;width:'+(rs-mn)+'%"></div>'; if(mx<100) h+='<div class="z lock" style="left:'+mx+'%;width:'+(100-mx)+'%"></div>';
+  if(live) h+='<div class="now" style="left:'+live.soc+'%"><b>'+nf(live.soc,0)+' %</b></div>';
+  [0,25,50,75,100].forEach(function(t){ h+='<span class="tk" style="left:'+t+'%">'+t+'</span>'; }); $('socbar').innerHTML=h;
+  // Tagesleiste
+  var d='', on=cur('tcEnable')===0xaa; [1,2].forEach(function(n){ var p='tc'+n, a=cur(p+'StartH')+cur(p+'StartM')/60, b=cur(p+'EndH')+cur(p+'EndM')/60; if(isNaN(a)||isNaN(b)||b<=a) return; d+='<div class="w'+(n===2?' w2':'')+'" style="left:'+a/24*100+'%;width:'+(b-a)/24*100+'%">Fenster '+n+', Ziel '+cur(p+'Target')+' %</div>'; });
+  for(var t=0;t<=24;t+=3) d+='<span class="tk" style="left:'+t/24*100+'%">'+(t<10?'0':'')+t+'</span>'; var nowD=new Date(); d+='<div class="nowl" style="left:'+(nowD.getHours()+nowD.getMinutes()/60)/24*100+'%" title="jetzt"></div>';
+  $('day').innerHTML=d; $('day').className='day'+(on?'':' off');
+  // Knöpfe und Rahmen
+  Object.keys(GROUPS).forEach(function(g){ var ch=GROUPS[g].some(function(i){return edit[i]!==undefined;});
+    Array.prototype.forEach.call(document.querySelectorAll('[data-apply="'+g+'"],[data-discard="'+g+'"]'),function(b){ b.disabled=!ch; });
+    var pn={mode:'pMode',soc:'pSoc',power:'pPower',timed:'pTimed'}[g]; if(pn) $(pn).className='panel'+(ch||(g==='power'&&GROUPS.export.some(function(i){return edit[i]!==undefined;}))?' changed':''); });
+}
+function describe(id,v){ var d=defs[id]; if(d.kind==='enum'){ var o=d.options.filter(function(x){return x[0]===v;})[0]; return d.label+': '+(o?o[1]:v); } return d.label+': '+fmtUnit(id,v); }
+function apply(g){
+  var ids=GROUPS[g].filter(function(i){return edit[i]!==undefined;}); if(!ids.length) return;
+  // sinnvolle Reihenfolge: im Zwangsmodus erst Leistung und Befehl, dann die Betriebsart; beim Zeitfenster der Schalter zuletzt
+  var order={forcedPower:0,forcedCmd:1,emsMode:2,tcEnable:9,exportLimit:0,exportEnable:1}; ids.sort(function(a,b){return (order[a]===undefined?5:order[a])-(order[b]===undefined?5:order[b]);});
+  var text='Diese Werte werden in den Wechselrichter geschrieben:\n\n'+ids.map(function(i){return '  '+describe(i,edit[i])+'   (bisher '+(defs[i].kind==='enum'?describe(i,dev[i]).split(': ')[1]:fmtUnit(i,dev[i]))+')';}).join('\n');
+  if(ids.some(function(i){return !defs[i].verified;})) text+='\n\nMindestens ein Register ist noch ungeprüft. Der Wert wird nach dem Schreiben zurückgelesen.';
+  if(!window.confirm(text)) return;
+  var r=$(RES[g]); r.innerHTML='schreibe …';
+  fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({changes:ids.map(function(i){return {id:i,value:edit[i]};})})}).then(function(x){return x.json();}).then(function(d){
+    r.innerHTML=d.results.map(function(o){return '<span class="'+(o.ok?'ok':'bad')+'">'+esc((o.label?o.label+': ':'')+o.message)+'</span>';}).join('<br>');
+    d.results.forEach(function(o){ if(o.ok) delete edit[o.id]; }); takeSettings(d.settings);
+  }).catch(function(e){ r.innerHTML='<span class="bad">Die Steuerung antwortet nicht: '+esc(e.message)+'</span>'; });
+}
+function takeSettings(s){
+  if(!s||s.error){ $('sBanner').className='banner on'; $('sBanner').textContent='Einstellungen nicht lesbar: '+(s&&s.error||'keine Antwort'); return; }
+  s.defs.forEach(function(d){defs[d.id]=d;}); dev=s.values; live=s.live;
+  $('sBanner').className=s.errors.length?'banner on':'banner'; $('sBanner').innerHTML=s.errors.length?'<b>Nicht alles ließ sich lesen</b> ('+esc(s.inverter)+'): '+s.errors.map(esc).join('; ')+'. Der WiNet-S ist manchmal beschäftigt: „Neu einlesen“ hilft meist.':'';
+  $('hints').innerHTML=s.hints.map(function(h){return '<div class="hintbox'+(h.level==='note'?' note':'')+'">'+esc(h.text)+'</div>';}).join('')+(s.matchingActive?'<div class="hintbox note">Der Matching-Ablauf läuft. Betriebsart und untere Entladegrenze sind solange gesperrt.</div>':'');
+  $('readAt').textContent=s.at?'gelesen um '+new Date(s.at).toLocaleTimeString('de-DE'):'';
+  $('topStatus').textContent=live?'Batterie '+nf(live.soc,1)+' %, '+(live.power===0?'ruht':(live.power>0?'lädt ':'entlädt ')+nf(Math.abs(live.power)/1000,2)+' kW'):'keine Messwerte';
+  $('chLog').innerHTML=s.log.map(function(l){return '<div'+(l.ok?'':' class="bad"')+'><b>'+new Date(l.t).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</b>'+esc(l.label)+': '+esc(l.from)+' \u2192 '+esc(l.to)+(l.ok?'':' (nicht übernommen)')+'</div>';}).join('')||'<div>Noch keine Änderungen.</div>';
+  renderSettings();
+}
+function loadSettings(force){ return fetch('/api/settings'+(force?'?force=1':''),{cache:'no-store'}).then(function(r){return r.json();}).then(takeSettings).catch(function(e){ takeSettings({error:e.message}); }); }
+Array.prototype.forEach.call(document.querySelectorAll('[data-apply]'),function(b){ b.onclick=function(){ apply(b.getAttribute('data-apply')); }; });
+Array.prototype.forEach.call(document.querySelectorAll('[data-discard]'),function(b){ b.onclick=function(){ GROUPS[b.getAttribute('data-discard')].forEach(function(i){ delete edit[i]; }); renderSettings(); }; });
+$('reload').onclick=function(){ $('readAt').textContent='lese …'; loadSettings(true); };
+window.addEventListener('beforeunload',function(e){ if(Object.keys(edit).length){ e.preventDefault(); e.returnValue=''; } });
+
+/* ================= Matching ================= */
+var lastNeeds=false,titleTimer=null;
+
+function beep(){try{var C=window.AudioContext||window.webkitAudioContext,a=new C();[0,0.35,0.7].forEach(function(d){var o=a.createOscillator(),g=a.createGain();o.frequency.value=880;o.connect(g);g.connect(a.destination);g.gain.setValueAtTime(0.0001,a.currentTime+d);g.gain.exponentialRampToValueAtTime(0.25,a.currentTime+d+0.02);g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+d+0.28);o.start(a.currentTime+d);o.stop(a.currentTime+d+0.3);});}catch(e){}}
+function act(a,q){ if(q&&!window.confirm(q))return;
+  fetch('/api/state',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:a})}).then(function(r){return r.json();}).then(function(d){if(d.error)window.alert(d.error);renderMatching(d.state);}).catch(function(e){window.alert('Das Matching-Programm antwortet nicht: '+e.message);}); }
+function renderMatching(m){
+  var idx=-1; m.steps.forEach(function(s,i){if(s.id===m.state)idx=i;});
+  $('steps').innerHTML=m.steps.map(function(s,i){var c=(m.active||m.state==='done')?(i<idx?'done':i===idx?'now':''):'';if(s.user)c+=' user';return '<li class="'+c+'">'+esc(s.title)+'</li>';}).join('');
+  $('dot').className=m.monitorOk?'dot':'dot off'; matchingActive=m.active; $('tabM').className=m.active?'live':''; if(m.needsUser&&tab!=='matching'){ showTab('matching'); }
+  $('mStatus').textContent = m.monitorOk ? (m.active?(m.paused?'angehalten':'Ablauf läuft'):'bereit')+(m.want?', Wechselrichter soll: '+m.want:'')+(m.live?', ist: '+m.live.ems:'') : 'keine Messwerte';
+  var b=$('mBanner'), bt=[]; if(!m.monitorOk) bt.push('<b>Keine Messwerte.</b> '+esc(m.monitorWhy||'')+' Prüfe im Monitor, ob der Wechselrichter erreichbar ist.');
+  if(m.writeError) bt.push('<b>Der letzte Steuerbefehl kam nicht an:</b> '+esc(m.writeError)+'. Ich versuche es weiter.');
+  b.className=bt.length?'banner on':'banner'; b.innerHTML=bt.join('<br>');
+  var P=m.params, msg=$('msg');
+  if(!m.active&&m.state!=='done'){ msg.className='msg'; msg.textContent='Gleicht ein nachgerüstetes Modul an den Bestand an: erst wird Modul '+P.targetModule+' mit festen '+P.fineWatts+' W bis an sein unteres Knie ('+nf(P.kneeVolt,2)+' V) entladen und entnommen, dann der Bestand genauso, dann wird alles zusammen nachgeladen. Das Programm steuert den Wechselrichter dabei selbst. Du brauchst eine große, einstellbare Last (zum Beispiel ein E-Auto an der Wallbox) und baust zweimal um. Arbeiten an der Hochvoltbatterie nur durch Fachkundige und nach Herstelleranleitung.'; }
+  else { msg.className='msg'+(m.needsUser?' you':''); msg.textContent=m.paused?m.paused.reason:m.message; }
+  var w=$('warn'); w.style.display=m.warn?'':'none'; w.textContent=m.warn||'';
+  var v=[], mins=m.since?Math.floor((Date.now()-m.since)/60000):0;
+  if(m.live){ v.push(['Anzeige',nf(m.live.soc,1)+' %']); v.push(['Batterie',m.live.power===0?'ruht':(m.live.power>0?'lädt ':'entlädt ')+nf(Math.abs(m.live.power)/1000,2)+' kW']); }
+  if(m.active){ v.push(['Modul '+P.targetModule+', niedrigste Zelle',m.targetMin!==null?nf(m.targetMin,4)+' V':'nicht im Turm']); v.push(['Bestand, niedrigste Zelle',m.othersMin!==null?nf(m.othersMin,4)+' V':'\u2013']); }
+  if(m.ref) v.push(['Referenz, niedrigste Zelle in Ruhe',nf(m.ref.min,4)+' V']);
+  if(m.result&&m.result.diffMv!==undefined) v.push(['Abstand zur Referenz',(m.result.diffMv>0?'+':'')+nf(m.result.diffMv,1)+' mV']);
+  if(m.result&&m.result.kneeSoc!==undefined) v.push(['Modul '+P.targetModule+' leer bei Anzeige',nf(m.result.kneeSoc,1)+' %']);
+  if(m.result&&m.result.spreadAfterMv!==undefined) v.push(['Spreizung nach dem Zusammenbau',nf(m.result.spreadAfterMv,1)+' mV']);
+  if(m.active) v.push(['In diesem Schritt seit',mins+' min']);
+  $('vals').innerHTML=v.map(function(r){return '<div><dt>'+r[0]+'</dt><dd>'+r[1]+'</dd></div>';}).join('');
+  var h='';
+  if(!m.active) h='<button class="pri" data-a="start" data-q="Ablauf starten? Das Programm steuert ab jetzt den Wechselrichter (Zwangsmodus laden, entladen, Stopp). Du kannst jederzeit anhalten.">Ablauf starten</button>';
+  else { if(m.paused) h+='<button class="pri" data-a="resume">Fortsetzen</button>';
+    else { if(m.needsUser) h+='<button class="pri" data-a="next">Weiter</button>'; else if(m.state==='rest2'&&m.result&&m.result.diffMv!==undefined) h+='<button data-a="next" data-q="Weitere Korrekturen überspringen und mit dem jetzigen Stand zum Wiedereinbau gehen?">Korrekturen beenden</button>'; else if(m.state==='bulk1'||m.state==='bulk2') h+='<button data-a="next" data-q="Jetzt schon auf die Feinentladung mit fester Leistung umschalten?">Weiter</button>'; h+='<button data-a="pause">Anhalten, Batterie ruht</button>'; }
+    h+='<button class="danger" data-a="abort" data-q="Ablauf abbrechen und den Wechselrichter auf Eigenverbrauch zurückstellen?">Abbrechen</button>'; }
+  $('btns').innerHTML=h;
+  Array.prototype.forEach.call($('btns').querySelectorAll('button'),function(x){x.onclick=function(){act(x.getAttribute('data-a'),x.getAttribute('data-q'));};});
+  var mods=m.live?m.live.modules.filter(function(x){return x.min!==null;}):[];
+  if(mods.length){ var lo=Math.min(P.floorVolt-0.02,Math.min.apply(null,mods.map(function(x){return x.min;}))-0.01), hi=Math.max.apply(null,mods.map(function(x){return x.max;}))+0.01, X=function(u){return Math.max(0,Math.min(100,(u-lo)/(hi-lo)*100));};
+    $('mods').innerHTML=mods.slice().sort(function(a,b){return b.index-a.index;}).map(function(x){return '<div class="mod'+(x.index===P.targetModule?' tg':'')+'"><span class="n">Modul '+x.index+(x.index===P.targetModule?' <span>neu</span>':'')+'</span><span class="t"><i style="left:0;width:'+X(x.min)+'%"></i><em style="left:'+X(P.kneeVolt)+'%"></em></span><span class="v">'+nf(x.min,4)+' V</span></div>';}).join('');
+    $('modHint').textContent='Rote Marke: Stopp der Feinentladung bei '+nf(P.kneeVolt,2)+' V. Spreizung über alle Zellen: '+nf(m.live.spreadMv,1)+' mV.';
+  } else { $('mods').innerHTML=''; $('modHint').textContent=m.monitorOk?'Der Monitor liefert gerade keine Zellwerte.':''; }
+  $('log').innerHTML=(m.log||[]).slice().reverse().map(function(l){return '<div><b>'+new Date(l.t).toLocaleTimeString('de-DE')+'</b>'+esc(l.text)+'</div>';}).join('')||'<div>Noch keine Einträge.</div>';
+  var needs=m.needsUser||!!(m.paused&&!m.paused.auto);
+  if(needs&&!lastNeeds){beep();if(!titleTimer){var on=false;titleTimer=setInterval(function(){on=!on;document.title=on?'\u25CF DU BIST DRAN':'Sungrow Steuerung';},1000);}}
+  if(!needs&&titleTimer){clearInterval(titleTimer);titleTimer=null;document.title='Sungrow Steuerung';}
+  lastNeeds=needs;
+}
+function refreshMatching(){fetch('/api/state',{cache:'no-store'}).then(function(r){return r.json();}).then(renderMatching).catch(function(){$('dot').className='dot off';$('mStatus').textContent='Die Steuerung antwortet nicht';});}
+
+if(location.pathname.indexOf('matching')>=0||location.hash==='#matching') showTab('matching');
+loadSettings(false); setInterval(function(){ if(!Object.keys(edit).length) loadSettings(false); },30000);
+refreshMatching(); setInterval(refreshMatching,4000);
+})();
+</script>
+</body>
+</html>

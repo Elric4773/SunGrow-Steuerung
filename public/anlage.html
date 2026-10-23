@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<!--
+  Sungrow Steuerung – (C) by Elric M.
+  Nur für die private Nutzung zu Test- und Lernzwecken. Kommerzielle Verwendung, Verwendung im Geschäftsbetrieb und
+  Weiterverkauf untersagt. Benutzung auf eigene Gefahr, ohne Gewährleistung oder Garantie. Siehe LICENSE und HANDBUCH.md.
+-->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anlage einrichten</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#E7EAED;--panel:#F8F9FA;--ink:#17202A;--muted:#5A6673;--line:#C9D0D7;--track:#DDE2E7;--pv:#C98A00;--grid:#2A5FC4;--batt:#0A8575;--alert:#C2352B;--edit:#FFF3D6}
+@media (prefers-color-scheme:dark){:root{--bg:#141A21;--panel:#1C242D;--ink:#E6EAEE;--muted:#97A3AF;--line:#34404C;--track:#2A343F;--pv:#E5A823;--grid:#6F9BEF;--batt:#35B9A6;--alert:#EF6A5F;--edit:#3A3016}}
+*{box-sizing:border-box} html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Barlow Semi Condensed",Bahnschrift,"DIN Alternate","Arial Narrow",sans-serif;font-size:17px;line-height:1.35;font-variant-numeric:tabular-nums}
+.wrap{max-width:1200px;margin:0 auto;padding:20px 24px 120px}
+.top{display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid var(--ink);flex-wrap:wrap}
+.top a{font-size:18px;padding:8px 20px;border:2px solid var(--ink);border-bottom:0;color:var(--ink);text-decoration:none;margin-bottom:-2px}
+.top a[aria-current="page"]{background:var(--ink);color:var(--panel)}
+.top a:hover,.top a:focus-visible{background:var(--track)} .top a[aria-current="page"]:hover{background:var(--ink)}
+.top .copy{margin-left:auto;align-self:center;color:var(--muted);font-size:15px;white-space:nowrap;padding:0 2px 6px 16px}
+h1{font-size:30px;font-weight:600;margin:0 0 4px} h2{font-size:21px;font-weight:600;margin:0} h3{font-size:17px;font-weight:600;margin:0}
+.lead{color:var(--muted);margin:0 0 6px;max-width:80ch}
+.panel{background:var(--panel);border:1px solid var(--line);padding:20px 22px;margin-top:20px}
+.phead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px 16px;margin-bottom:14px}
+.phead p{margin:4px 0 0;color:var(--muted);font-size:15px;max-width:76ch}
+.banner{margin-top:14px;padding:12px 16px;border-left:5px solid var(--pv);background:var(--panel)} .banner.bad{border-left-color:var(--alert)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px 18px}
+label.f{display:block} label.f span{display:block;font-size:14px;color:var(--muted);margin-bottom:3px}
+label.f small{display:block;font-size:13px;color:var(--muted);margin-top:3px}
+input[type=text],input[type=number],input[type=password],select{font:inherit;width:100%;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:5px 8px;min-height:36px}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid var(--grid);outline-offset:2px}
+input.bad{border-color:var(--alert);box-shadow:inset 0 -3px 0 var(--alert)}
+.chk{display:flex;gap:10px;align-items:center;cursor:pointer} .chk input{width:20px;height:20px;accent-color:var(--ink)}
+button.b{font:inherit;font-size:16px;padding:7px 16px;border:2px solid var(--ink);background:var(--panel);color:var(--ink);cursor:pointer}
+button.b.pri{background:var(--ink);color:var(--panel)} button.b.danger{border-color:var(--alert);color:var(--alert)}
+button.b[disabled]{opacity:.4;cursor:default}
+.acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.inv{border:2px solid var(--line);padding:16px 18px;margin-top:14px;background:var(--panel)}
+.inv.off{opacity:.72;border-style:dashed}
+.inv .ih{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:12px}
+.inv .ih .tag{font-size:13px;padding:2px 8px;border:1px solid var(--muted);color:var(--muted)} .inv .ih .tag.main{border-color:var(--batt);color:var(--batt)}
+.inv .ih .acts{margin-left:auto}
+.res{font-size:15px;margin:12px 0 0} .res .ok{color:var(--batt)} .res .bad{color:var(--alert)} .res ul{margin:4px 0 0 18px;padding:0}
+details{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-weight:600}
+.regs{width:100%;border-collapse:collapse;font-size:15px;margin-top:10px}
+.regs th{text-align:left;font-weight:600;border-bottom:2px solid var(--ink);padding:5px 8px 5px 0;white-space:nowrap}
+.regs td{border-bottom:1px solid var(--line);padding:4px 8px 4px 0;vertical-align:middle}
+.regs td.n{text-align:right;white-space:nowrap} .regs .grp td{font-weight:600;padding-top:12px;border-bottom:1px solid var(--ink)}
+.regs input{width:96px;min-height:30px;padding:2px 6px;text-align:right}
+.regs tr.custom input{background:var(--edit);border-color:var(--pv)}
+.regs .val{color:var(--batt)} .regs .err{color:var(--alert);font-size:13px}
+.regwrap{overflow-x:auto}
+.seg{display:inline-flex;border:2px solid var(--ink);flex-wrap:wrap} .seg button{font:inherit;font-size:16px;padding:6px 16px;border:0;background:none;color:var(--ink);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:2px solid var(--ink);padding:12px 24px;z-index:5}
+.bar .in{max-width:1200px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+.bar .msg{flex:1 1 300px;font-size:15px} .bar .msg .bad{color:var(--alert)}
+.gate{max-width:440px}
+.hint{color:var(--muted);font-size:15px;margin:10px 0 0;max-width:80ch}
+.overlay{position:fixed;inset:0;background:rgba(10,14,18,.55);display:none;align-items:center;justify-content:center;z-index:9}
+.overlay.on{display:flex} .overlay div{background:var(--panel);border:2px solid var(--ink);padding:24px 28px;max-width:440px;font-size:19px}
+[hidden]{display:none!important}
+@media (max-width:640px){.wrap{padding:16px 16px 140px}.top a{padding:7px 12px;font-size:16px}.inv .ih .acts{margin-left:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="top" aria-label="Bereiche"><a href="/">Monitor</a><a href="/einstellungen">Einstellungen</a><a href="/matching">Matching</a><a href="/anlage" aria-current="page">Anlage</a><span class="copy">(C) by Elric M.</span></nav>
+  <h1>Anlage einrichten</h1>
+  <p class="lead">Wechselrichter, Registeradressen, WiNet-S und Batterie. Gespeichert wird in config.json, danach startet die Steuerung neu.</p>
+  <div class="banner" id="firstRun" hidden><b>Noch nicht eingerichtet.</b> Lege zuerst ein Passwort für diese Seite fest und trage dann mindestens den Hybridwechselrichter ein. Monitor, Einstellungen und Matching laufen, sobald gespeichert ist.</div>
+  <div class="banner bad" id="loadErr" hidden></div>
+
+  <!-- Zugang -->
+  <section class="panel gate" id="setPw" hidden aria-labelledby="hSetPw">
+    <h2 id="hSetPw">Passwort für diese Seite festlegen</h2>
+    <p class="hint">Diese Seite zeigt und ändert IP-Adressen und das WiNet-Passwort. Mindestens 8 Zeichen. Vergessen? In config.json den Abschnitt „admin“ löschen und neu starten.</p>
+    <form id="fSetPw"><div class="grid" style="grid-template-columns:1fr;margin-top:12px">
+      <label class="f"><span>Neues Passwort</span><input type="password" id="pw1" autocomplete="new-password" minlength="8" required></label>
+      <label class="f"><span>Wiederholen</span><input type="password" id="pw2" autocomplete="new-password" minlength="8" required></label>
+    </div><div class="acts" style="margin-top:14px"><button class="b pri" type="submit">Festlegen</button></div><p class="res" id="rSetPw"></p></form>
+  </section>
+  <section class="panel gate" id="login" hidden aria-labelledby="hLogin">
+    <h2 id="hLogin">Anmelden</h2>
+    <form id="fLogin"><div class="grid" style="grid-template-columns:1fr;margin-top:12px">
+      <label class="f"><span>Passwort</span><input type="password" id="pwL" autocomplete="current-password" required></label>
+    </div><div class="acts" style="margin-top:14px"><button class="b pri" type="submit">Anmelden</button></div><p class="res" id="rLogin"></p></form>
+  </section>
+
+  <!-- Einstellungen -->
+  <div id="editor" hidden>
+    <section class="panel" aria-labelledby="hPlant">
+      <div class="phead"><div><h2 id="hPlant">Anlage</h2></div></div>
+      <div class="grid">
+        <label class="f"><span>Name der Anlage</span><input type="text" id="plantName" maxlength="80"><small>Überschrift im Monitor</small></label>
+        <label class="f"><span>Port der Weboberfläche</span><input type="number" id="httpPort" min="1024" max="65535"><small>Standard 8787</small></label>
+        <label class="f"><span>Messintervall, Sekunden</span><input type="number" id="pollSeconds" min="5" max="300"><small>Standard 10</small></label>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="hInv">
+      <div class="phead"><div><h2 id="hInv">Wechselrichter</h2>
+        <p>Genau ein aktiver Hybridwechselrichter mit Batterie, dazu beliebig viele Stringwechselrichter. Die Register sind mit den Sungrow-Standardadressen vorbelegt und lassen sich je Gerät ändern. „Verbindung testen“ liest alle eingetragenen Register sofort aus, ohne zu speichern.</p></div>
+        <div class="acts"><button class="b" type="button" id="addHybrid">Hybrid hinzufügen</button><button class="b" type="button" id="addString">Stringwechselrichter hinzufügen</button></div></div>
+      <div id="invs"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="hCells">
+      <div class="phead"><div><h2 id="hCells">Zellwerte der Batterie</h2>
+        <p>Der WiNet-S reicht die Batterie meist nicht über Modbus durch. Seine Weboberfläche liest sie aber, und diesen Weg nutzt die Steuerung. Dafür braucht sie Benutzer und Passwort der WiNet-S-Weboberfläche.</p></div></div>
+      <div class="seg" role="group" aria-label="Quelle der Zellwerte" id="cellSource">
+        <button type="button" data-v="winet">WiNet-S Weboberfläche</button><button type="button" data-v="modbus">Modbus (Geräteadresse der Batterie)</button><button type="button" data-v="off">keine Zellwerte</button>
+      </div>
+      <div id="winetBox" style="margin-top:16px">
+        <div class="grid">
+          <label class="f"><span>Adresse des WiNet-S</span><input type="text" id="wHost" placeholder="leer = wie der Hybrid"><small>meist dieselbe wie beim Hybrid</small></label>
+          <label class="f"><span>Port</span><input type="number" id="wPort" min="1" max="65535"><small>Standard 443</small></label>
+          <label class="f"><span>Benutzer</span><input type="text" id="wUser" autocomplete="off"></label>
+          <label class="f"><span>Passwort</span><input type="password" id="wPass" autocomplete="new-password"><small id="wPassHint"></small></label>
+          <label class="f"><span>Abfrage alle … Sekunden</span><input type="number" id="wInt" min="10" max="600"><small>Standard 30, im Matching automatisch 10</small></label>
+          <label class="f"><span>Zellblock ab Adresse</span><input type="number" id="wAddr" min="0" max="65535"><small>Standard 10756 (Doku 10757)</small></label>
+          <label class="f"><span>Anzahl Register</span><input type="number" id="wCount" min="24" max="60"><small>Standard 30</small></label>
+        </div>
+        <div class="acts" style="margin-top:14px"><button class="b" type="button" id="testWinet">WiNet-S testen</button></div>
+        <p class="hint">Der Test meldet sich mit den eingegebenen Daten an. Der WiNet-S erlaubt meist nur eine Anmeldung: die laufende Abfrage meldet sich danach von selbst wieder an.</p>
+        <p class="res" id="rWinet"></p>
+      </div>
+      <div id="modbusBox" style="margin-top:16px" hidden>
+        <div class="grid">
+          <label class="f"><span>Geräteadresse der Batterie</span><input type="number" id="mUnit" min="0" max="247"><small>Standard 200, Verbindung über den Hybrid</small></label>
+          <label class="f"><span>Zellblock ab Adresse</span><input type="number" id="mAddr" min="0" max="65535"><small>Standard 10756</small></label>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="hBatt">
+      <div class="phead"><div><h2 id="hBatt">Batterieturm</h2><p>Bestimmt die Darstellung im Monitor und das Zielmodul des Matching-Assistenten.</p></div></div>
+      <div class="grid">
+        <label class="f"><span>Anzahl der Module</span><select id="modCount"></select></label>
+        <label class="f"><span>Oberstes Modul im Turm</span><select id="modTop"></select><small>meist die höchste Nummer</small></label>
+        <label class="f"><span>Nachgerüstetes Modul (Matching)</span><select id="modTarget"></select></label>
+      </div>
+      <h3 style="margin-top:18px">Notizen je Modul</h3>
+      <p class="hint" style="margin-top:2px">Optional, zum Beispiel „neu“. Ein Modul mit Notiz wird im Moduldiagramm hervorgehoben.</p>
+      <div class="grid" id="notes" style="margin-top:10px"></div>
+    </section>
+
+    <section class="panel gate" aria-labelledby="hAcc">
+      <div class="phead"><div><h2 id="hAcc">Zugang</h2></div><div class="acts"><button class="b" type="button" id="logout">Abmelden</button></div></div>
+      <form id="fChPw"><div class="grid" style="grid-template-columns:1fr">
+        <label class="f"><span>Bisheriges Passwort</span><input type="password" id="pwO" autocomplete="current-password" required></label>
+        <label class="f"><span>Neues Passwort</span><input type="password" id="pwN" autocomplete="new-password" minlength="8" required></label>
+      </div><div class="acts" style="margin-top:14px"><button class="b" type="submit">Passwort ändern</button></div><p class="res" id="rChPw"></p></form>
+    </section>
+  </div>
+</div>
+
+<div class="bar" id="bar" hidden><div class="in">
+  <div class="msg" id="barMsg" aria-live="polite">Keine Änderungen.</div>
+  <button class="b" type="button" id="discard" disabled>Verwerfen</button>
+  <button class="b pri" type="button" id="save" disabled>Speichern und neu starten</button>
+</div></div>
+<div class="overlay" id="overlay" role="alert"><div id="overlayText">Gespeichert. Die Steuerung startet neu …</div></div>
+
+<script>
+(function(){
+'use strict';
+var $=function(id){return document.getElementById(id);};
+var esc=function(s){return String(s===undefined||s===null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+var nf=function(v,d){return v===null||v===undefined||isNaN(v)?'–':Number(v).toLocaleString('de-DE',{minimumFractionDigits:0,maximumFractionDigits:d});};
+var TYPES=null, MAXMOD=8, C=null, orig='', status=null;
+
+function api(path, body){
+  var o = body===undefined ? {cache:'no-store'} : {method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'sungrow'},body:JSON.stringify(body)};
+  return fetch('/api/setup/'+path,o).then(function(r){ return r.json().then(function(j){ j._status=r.status; return j; }); });
+}
+function show(id,on){ $(id).hidden=!on; }
+
+/* ---------- Zugang ---------- */
+function start(){
+  api('status').then(function(s){
+    status=s; show('firstRun',!s.configured);
+    if(!s.passwordSet){ show('setPw',true); $('pw1').focus(); return; }
+    if(!s.loggedIn){ show('login',true); $('pwL').focus(); return; }
+    loadConfig();
+  }).catch(function(e){ $('loadErr').hidden=false; $('loadErr').textContent='Die Steuerung antwortet nicht: '+e.message; });
+}
+$('fSetPw').onsubmit=function(e){ e.preventDefault();
+  if($('pw1').value!==$('pw2').value){ $('rSetPw').innerHTML='<span class="bad">Die beiden Eingaben stimmen nicht überein.</span>'; return; }
+  api('password',{password:$('pw1').value}).then(function(j){ if(j.ok){ show('setPw',false); loadConfig(); } else $('rSetPw').innerHTML='<span class="bad">'+esc(j.error)+'</span>'; });
+};
+$('fLogin').onsubmit=function(e){ e.preventDefault();
+  api('login',{password:$('pwL').value}).then(function(j){ if(j.ok){ show('login',false); loadConfig(); } else { $('rLogin').innerHTML='<span class="bad">'+esc(j.error)+'</span>'; $('pwL').select(); } });
+};
+$('fChPw').onsubmit=function(e){ e.preventDefault();
+  api('password',{old:$('pwO').value,password:$('pwN').value}).then(function(j){ $('rChPw').innerHTML=j.ok?'<span class="ok">Passwort geändert.</span>':'<span class="bad">'+esc(j.error)+'</span>'; if(j.ok){ $('pwO').value=''; $('pwN').value=''; } });
+};
+$('logout').onclick=function(){ api('logout',{}).then(function(){ location.reload(); }); };
+
+/* ---------- Laden ---------- */
+function loadConfig(){
+  api('config').then(function(j){
+    if(j._status===401){ show('editor',false); show('bar',false); show('login',true); return; }
+    TYPES=j.types; MAXMOD=j.maxModules||8; C=j.config;
+    C.inverters.forEach(function(i){ i.registers=fullRegs(i.type,i.registers); i._open=false; i._test=null; });
+    if(!C.inverters.length) C.inverters.push(newInv('hybrid'));
+    C.winet.password='';
+    orig=snapshot(); show('editor',true); show('bar',true); render();
+  });
+}
+function fullRegs(type, over){ var out={}; TYPES[type].map.forEach(function(d){ out[d.key]=over&&over[d.key]!==undefined?over[d.key]:d.addr; }); return out; }
+function newInv(type){
+  var n=C.inverters.filter(function(i){return i.type===type;}).length+1;
+  return { name:type==='hybrid'?(n>1?'Hybrid '+n:'Hybrid'):'String '+n, enabled:true, type:type, host:'', port:502, unitId:1, ratedPower:10600, addToHouseLoad:true, registers:fullRegs(type,{}), _open:false, _test:null };
+}
+function snapshot(){ return JSON.stringify(payload()); }
+function payload(){
+  return { plantName:C.plantName, httpPort:+C.httpPort, pollSeconds:+C.pollSeconds,
+    inverters:C.inverters.map(function(i){ var o={name:i.name,enabled:i.enabled,type:i.type,host:i.host,port:+i.port,unitId:+i.unitId,registers:i.registers}; if(i.type==='hybrid') o.ratedPower=+i.ratedPower; else o.addToHouseLoad=i.addToHouseLoad; return o; }),
+    cellSource:C.cellSource, winet:{host:C.winet.host,port:+C.winet.port,username:C.winet.username,password:C.winet.password,intervalSeconds:+C.winet.intervalSeconds,paramAddress:+C.winet.paramAddress,paramCount:+C.winet.paramCount},
+    modbusBattery:{unitId:+C.modbusBattery.unitId,cellBlockAddress:+C.modbusBattery.cellBlockAddress},
+    moduleCount:+C.moduleCount, topModuleIndex:+C.topModuleIndex, targetModule:+C.targetModule, moduleNotes:C.moduleNotes };
+}
+function changed(){
+  var dirty = snapshot()!==orig;
+  $('save').disabled=!dirty; $('discard').disabled=!dirty;
+  if(dirty) $('barMsg').textContent='Ungespeicherte Änderungen.'; else if(!$('barMsg').querySelector('.bad')) $('barMsg').textContent='Keine Änderungen.';
+}
+
+/* ---------- Darstellung ---------- */
+function bindVal(id, obj, key, num){ var el=$(id); el.value=obj[key]===null||obj[key]===undefined?'':obj[key]; el.oninput=function(){ obj[key]=num?(el.value===''?'':Number(el.value)):el.value; changed(); }; }
+function render(){
+  bindVal('plantName',C,'plantName'); bindVal('httpPort',C,'httpPort',true); bindVal('pollSeconds',C,'pollSeconds',true);
+  renderInvs();
+  Array.prototype.forEach.call($('cellSource').querySelectorAll('button'),function(b){
+    b.setAttribute('aria-pressed',String(C.cellSource===b.getAttribute('data-v')));
+    b.onclick=function(){ C.cellSource=b.getAttribute('data-v'); render(); changed(); };
+  });
+  show('winetBox',C.cellSource==='winet'); show('modbusBox',C.cellSource==='modbus');
+  bindVal('wHost',C.winet,'host'); bindVal('wPort',C.winet,'port',true); bindVal('wUser',C.winet,'username'); bindVal('wPass',C.winet,'password');
+  bindVal('wInt',C.winet,'intervalSeconds',true); bindVal('wAddr',C.winet,'paramAddress',true); bindVal('wCount',C.winet,'paramCount',true);
+  $('wPass').placeholder=C.winet.passwordSet?'unverändert lassen':'';
+  $('wPassHint').textContent=C.winet.passwordSet?'Ein Passwort ist gespeichert. Leer lassen, um es zu behalten.':'Noch kein Passwort gespeichert.';
+  bindVal('mUnit',C.modbusBattery,'unitId',true); bindVal('mAddr',C.modbusBattery,'cellBlockAddress',true);
+  var opts=function(n,sel){ var h=''; for(var i=1;i<=n;i++) h+='<option value="'+i+'"'+(i===+sel?' selected':'')+'>'+i+'</option>'; return h; };
+  $('modCount').innerHTML=opts(MAXMOD,C.moduleCount); $('modTop').innerHTML=opts(+C.moduleCount,C.topModuleIndex); $('modTarget').innerHTML=opts(+C.moduleCount,C.targetModule);
+  $('modCount').onchange=function(){ C.moduleCount=+this.value; if(C.topModuleIndex>C.moduleCount) C.topModuleIndex=C.moduleCount; if(C.targetModule>C.moduleCount) C.targetModule=C.moduleCount; render(); changed(); };
+  $('modTop').onchange=function(){ C.topModuleIndex=+this.value; changed(); };
+  $('modTarget').onchange=function(){ C.targetModule=+this.value; changed(); };
+  var nh=''; for(var m=1;m<=+C.moduleCount;m++) nh+='<label class="f"><span>Modul '+m+'</span><input type="text" maxlength="40" data-m="'+m+'" value="'+esc(C.moduleNotes[m]||'')+'"></label>';
+  $('notes').innerHTML=nh;
+  Array.prototype.forEach.call($('notes').querySelectorAll('input'),function(el){ el.oninput=function(){ var m=el.getAttribute('data-m'); if(el.value.trim()) C.moduleNotes[m]=el.value; else delete C.moduleNotes[m]; changed(); }; });
+  changed();
+}
+
+function renderInvs(){
+  var box=$('invs'); box.innerHTML='';
+  var activeHybrids=C.inverters.filter(function(i){return i.type==='hybrid'&&i.enabled;}).length;
+  C.inverters.forEach(function(inv,idx){
+    var el=document.createElement('div'); el.className='inv'+(inv.enabled?'':' off');
+    var isMain = inv.type==='hybrid' && inv.enabled && activeHybrids===1;
+    el.innerHTML=
+      '<div class="ih"><h3>'+esc(inv.name||'(ohne Namen)')+'</h3><span class="tag'+(isMain?' main':'')+'">'+esc(TYPES[inv.type].label)+(isMain?', führt Batterie und Matching':'')+'</span>'+
+      '<label class="chk"><input type="checkbox" data-k="enabled"'+(inv.enabled?' checked':'')+'> aktiv</label>'+
+      '<div class="acts"><button class="b" type="button" data-a="test">Verbindung testen</button><button class="b danger" type="button" data-a="del">Entfernen</button></div></div>'+
+      '<div class="grid">'+
+        '<label class="f"><span>Name</span><input type="text" maxlength="40" data-k="name" value="'+esc(inv.name)+'"></label>'+
+        '<label class="f"><span>Typ</span><select data-k="type"><option value="hybrid"'+(inv.type==='hybrid'?' selected':'')+'>'+esc(TYPES.hybrid.label)+'</option><option value="string"'+(inv.type==='string'?' selected':'')+'>'+esc(TYPES.string.label)+'</option></select></label>'+
+        '<label class="f"><span>IP-Adresse oder Hostname</span><input type="text" data-k="host" placeholder="z. B. WiNet-S des Geräts" value="'+esc(inv.host)+'"><small>die Adresse des WiNet-S an diesem Gerät</small></label>'+
+        '<label class="f"><span>Modbus-Port</span><input type="number" min="1" max="65535" data-k="port" value="'+esc(inv.port)+'"><small>Standard 502</small></label>'+
+        '<label class="f"><span>Geräteadresse (Unit)</span><input type="number" min="0" max="247" data-k="unitId" value="'+esc(inv.unitId)+'"><small>Standard 1</small></label>'+
+        (inv.type==='hybrid'
+          ? '<label class="f"><span>Nennleistung, Watt</span><input type="number" min="1000" max="50000" step="100" data-k="ratedPower" value="'+esc(inv.ratedPower)+'"><small>Obergrenze der Leistungsregler, z. B. 10600 bei einem 10-kW-Hybrid</small></label>'
+          : '<label class="chk" style="align-self:end;padding-bottom:22px"><input type="checkbox" data-k="addToHouseLoad"'+(inv.addToHouseLoad?' checked':'')+'> Leistung zum Hausverbrauch addieren</label>')+
+      '</div>'+
+      '<div class="res" data-r="res"></div>'+
+      '<details'+(inv._open?' open':'')+'><summary>Register ('+countCustom(inv)+' von Sungrow-Standard abweichend)</summary>'+
+        '<p class="hint">Adressen 0-basiert, also Registernummer aus der Sungrow-Dokumentation minus 1. Geänderte Adressen sind gelb. Format und Faktor sind fest, nur die Adresse ist wählbar.</p>'+
+        '<div class="acts" style="margin-top:8px"><button class="b" type="button" data-a="reset">Standard wiederherstellen</button></div>'+
+        '<div class="regwrap"><table class="regs"><thead><tr><th>Wert</th><th>Art</th><th>Adresse</th><th>Doku-Nr.</th><th>Format</th><th>Faktor</th><th>Testwert</th></tr></thead><tbody>'+regRows(inv)+'</tbody></table></div>'+
+      '</details>';
+    box.appendChild(el);
+    renderTest(inv, el);
+    el.querySelector('details').ontoggle=function(){ inv._open=this.open; };
+    Array.prototype.forEach.call(el.querySelectorAll('[data-k]'),function(f){
+      var k=f.getAttribute('data-k');
+      var upd=function(){
+        if(f.type==='checkbox') inv[k]=f.checked;
+        else if(f.type==='number') inv[k]=f.value===''?'':Number(f.value);
+        else inv[k]=f.value;
+        if(k==='type'){ inv.registers=fullRegs(inv.type,{}); inv._test=null; renderInvs(); }
+        else if(k==='enabled') renderInvs();
+        else if(k==='name') el.querySelector('h3').textContent=inv.name||'(ohne Namen)';
+        changed();
+      };
+      f.onchange=upd; if(f.tagName==='INPUT'&&f.type!=='checkbox') f.oninput=upd;
+    });
+    Array.prototype.forEach.call(el.querySelectorAll('input[data-reg]'),function(f){
+      f.oninput=function(){ var k=f.getAttribute('data-reg'), n=f.value===''?'':Number(f.value);
+        inv.registers[k]=n; var d=defOf(inv.type,k), tr=f.closest('tr');
+        tr.className = n!==d.addr ? 'custom' : ''; tr.querySelector('.doc').textContent = n===''||isNaN(n)?'–':(n+1);
+        f.classList.toggle('bad', !(Number.isInteger(n)&&n>=0&&n<=65535));
+        el.querySelector('summary').textContent='Register ('+countCustom(inv)+' von Sungrow-Standard abweichend)';
+        changed(); };
+    });
+    el.querySelector('[data-a="test"]').onclick=function(){ testInv(inv, el, this); };
+    el.querySelector('[data-a="del"]').onclick=function(){ if(window.confirm('Wechselrichter „'+(inv.name||'')+'“ entfernen?')){ C.inverters.splice(idx,1); renderInvs(); changed(); } };
+    el.querySelector('[data-a="reset"]').onclick=function(){ inv.registers=fullRegs(inv.type,{}); inv._open=true; renderInvs(); changed(); };
+  });
+}
+function defOf(type,key){ return TYPES[type].map.filter(function(d){return d.key===key;})[0]; }
+function countCustom(inv){ return TYPES[inv.type].map.filter(function(d){ return inv.registers[d.key]!==d.addr; }).length; }
+function regRows(inv){
+  var h='', grp='', t=inv._test, rows={}; if(t&&t.rows) t.rows.forEach(function(x){rows[x.key]=x;});
+  TYPES[inv.type].map.forEach(function(d){
+    if(d.group!==grp){ grp=d.group; h+='<tr class="grp"><td colspan="7">'+esc(grp)+'</td></tr>'; }
+    var a=inv.registers[d.key], x=rows[d.key];
+    var tv = !x ? '' : x.error ? '<span class="err">'+esc(x.error)+'</span>' : '<span class="val">'+nf(x.value,3)+' '+esc(d.unit)+'</span>';
+    h+='<tr'+(a!==d.addr?' class="custom"':'')+'><td>'+esc(d.label)+(d.core?' *':'')+'</td><td>'+(d.fc===4?'Input (04)':'Holding (03)')+'</td>'+
+      '<td><input type="number" min="0" max="65535" aria-label="Adresse '+esc(d.label)+'" data-reg="'+d.key+'" value="'+esc(a)+'"></td><td class="n doc">'+(a===''?'–':(+a+1))+'</td>'+
+      '<td>'+d.type+'</td><td class="n">'+nf(d.scale,2)+(d.unit?' '+esc(d.unit):'')+'</td><td>'+tv+'</td></tr>';
+  });
+  return h+'<tr><td colspan="7" class="hint" style="border:0">* ohne diesen Wert ist eine Messung unbrauchbar</td></tr>';
+}
+function renderTest(inv, el){
+  var r=el.querySelector('[data-r="res"]'), t=inv._test;
+  if(!t){ r.innerHTML=''; return; }
+  if(t.pending){ r.innerHTML='lese alle Register …'; return; }
+  var ok=t.rows?t.rows.filter(function(x){return x.value!==null;}).length:0, all=t.rows?t.rows.length:0;
+  r.innerHTML = (t.ok?'<span class="ok">Verbindung steht, '+ok+' von '+all+' Registern gelesen.</span>':'<span class="bad">'+esc(t.error||'Fehler')+'</span>'+(all?' ('+ok+' von '+all+' Registern gelesen)':''))+
+    (t.notes&&t.notes.length?'<ul>'+t.notes.map(function(n){return '<li class="bad">'+esc(n)+'</li>';}).join('')+'</ul>':'')+
+    (all?' Die Werte stehen unten in der Registertabelle.':'');
+}
+function testInv(inv, el, btn){
+  btn.disabled=true; inv._test={pending:true}; renderTest(inv,el);
+  api('test',{inverter:{type:inv.type,host:inv.host,port:+inv.port,unitId:+inv.unitId,registers:inv.registers}}).then(function(j){
+    inv._test=j; inv._open = inv._open || !!j.rows; renderInvs();
+  }).catch(function(e){ inv._test={ok:false,error:e.message}; renderTest(inv,el); }).then(function(){ btn.disabled=false; });
+}
+$('addHybrid').onclick=function(){ C.inverters.push(newInv('hybrid')); renderInvs(); changed(); };
+$('addString').onclick=function(){ C.inverters.push(newInv('string')); renderInvs(); changed(); };
+$('testWinet').onclick=function(){
+  var b=this; b.disabled=true; $('rWinet').textContent='melde mich an und lese die Zellwerte …';
+  var hy=C.inverters.filter(function(i){return i.type==='hybrid'&&i.enabled;})[0];
+  api('test-winet',{winet:payload().winet,inverterHost:hy?hy.host:''}).then(function(j){
+    $('rWinet').innerHTML = j.ok ? '<span class="ok">Angemeldet. '+esc(j.device)+': '+j.modulesSeen+' Module, Zellen '+nf(j.cellMin,4)+' bis '+nf(j.cellMax,4)+' V, Spreizung '+nf(j.spreadMv,1)+' mV.</span>' : '<span class="bad">'+esc(j.error)+'</span>';
+  }).catch(function(e){ $('rWinet').innerHTML='<span class="bad">'+esc(e.message)+'</span>'; }).then(function(){ b.disabled=false; });
+};
+
+/* ---------- Speichern ---------- */
+$('discard').onclick=function(){ if(window.confirm('Alle ungespeicherten Änderungen verwerfen?')) loadConfig(); };
+$('save').onclick=function(){
+  var b=this; b.disabled=true; $('barMsg').textContent='prüfe …';
+  var p=payload();
+  api('save',{config:p}).then(function(j){
+    if(!j.ok){ $('barMsg').innerHTML='<span class="bad"><b>Nicht gespeichert:</b> '+(j.errors||[j.error]).map(esc).join('; ')+'</span>'; b.disabled=false; return; }
+    orig=snapshot(); $('overlay').classList.add('on');
+    var target = location.protocol+'//'+location.hostname+':'+j.port+(status&&status.configured?'/anlage':'/');
+    if(+j.port!==+(location.port||(location.protocol==='https:'?443:80))){ $('overlayText').textContent='Gespeichert. Die Steuerung startet neu und ist gleich unter Port '+j.port+' erreichbar …'; setTimeout(function(){ location.href=target; },5000); return; }
+    var tries=0, wait=function(){ tries++; fetch('/api/setup/status',{cache:'no-store'}).then(function(r){return r.json();}).then(function(){ location.href=target; }).catch(function(){ if(tries<40) setTimeout(wait,1500); else $('overlayText').textContent='Die Steuerung meldet sich nicht zurück. Bitte das Log ansehen (data/steuerung.log) oder von Hand starten.'; }); };
+    setTimeout(wait,2500);
+  }).catch(function(e){ $('barMsg').innerHTML='<span class="bad">'+esc(e.message)+'</span>'; b.disabled=false; });
+};
+window.addEventListener('beforeunload',function(e){ if(C && snapshot()!==orig){ e.preventDefault(); e.returnValue=''; } });
+start();
+})();
+</script>
+</body>
+</html>

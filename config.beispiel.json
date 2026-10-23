@@ -1,0 +1,38 @@
+{
+  "plantName": "Meine Anlage",
+  "http": { "port": 8787 },
+  "pollSeconds": 10,
+  "inverters": [
+    {
+      "name": "Hybrid",
+      "type": "hybrid",
+      "enabled": true,
+      "host": "192.0.2.10",
+      "port": 502,
+      "unitId": 1,
+      "ratedPower": 10600,
+      "registers": {}
+    },
+    {
+      "name": "Dach West",
+      "type": "string",
+      "enabled": true,
+      "host": "192.0.2.11",
+      "port": 502,
+      "unitId": 1,
+      "addToHouseLoad": true,
+      "registers": {}
+    }
+  ],
+  "winet": {
+    "enabled": true,
+    "port": 443,
+    "username": "BENUTZERNAME",
+    "password": "PASSWORT"
+  },
+  "battery": { "enabled": false },
+  "moduleCount": 8,
+  "topModuleIndex": 8,
+  "moduleNotes": {},
+  "matching": { "targetModule": 8 }
+}
