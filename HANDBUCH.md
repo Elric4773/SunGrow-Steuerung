@@ -302,7 +302,19 @@ Das Protokoll steht in `data/steuerung.log` (bzw. im Journal von systemd).
 
 ---
 
-## 10. Lizenz und Haftung
+## 10. Unterstützen – für Maja
+
+Ich möchte kein Geld für die Software haben. Aber eine liebe Bitte an Euch: Ein kleines Mädel und ihre Familie
+würden sich freuen, wenn man ihnen hilft. Eine Spende – egal in welcher Höhe – wäre eine wunderschöne Tat.
+
+**[Für Maja – jeder Schritt zurück ins Leben zählt](https://www.gofundme.com/f/fur-maja-jeder-schritt-zuruck-ins-leben-zahlt)** (GoFundMe)
+
+Schreibt bitte beim Namen gerne den eigenen Namen & Elric oder als Name einfach „Elric“.
+Ganz lieben Dank!
+
+---
+
+## 11. Lizenz und Haftung
 
 Nur private, nicht gewerbliche Nutzung zu Test- und Lernzwecken. Kommerzielle Verwendung, Verwendung im
 Geschäftsbetrieb und Weiterverkauf sind untersagt. Benutzung auf eigene Gefahr, ohne Gewährleistung oder

@@ -42,6 +42,16 @@ Dann im Browser `http://<Rechner>:8787/anlage` öffnen, ein Passwort festlegen, 
 - Sungrow-Hybridwechselrichter der SH-RT-Reihe mit WiNet-S, Modbus TCP im lokalen Netz erreichbar
 - für die Zellspannungen: Zugang zur Weboberfläche des WiNet-S (Benutzer und Passwort)
 
+## Unterstützen – für Maja ❤️
+
+Ich möchte kein Geld für die Software haben. Aber eine liebe Bitte an Euch: Ein kleines Mädel und ihre Familie
+würden sich freuen, wenn man ihnen hilft. Eine Spende – egal in welcher Höhe – wäre eine wunderschöne Tat.
+
+👉 **[Für Maja – jeder Schritt zurück ins Leben zählt](https://www.gofundme.com/f/fur-maja-jeder-schritt-zuruck-ins-leben-zahlt)** (GoFundMe)
+
+Schreibt bitte beim Namen gerne den eigenen Namen & Elric oder als Name einfach „Elric“.
+Ganz lieben Dank!
+
 ## Wichtig
 
 Die Software **schreibt** auf Wunsch Einstellungen in den Wechselrichter und kann Lade- und
