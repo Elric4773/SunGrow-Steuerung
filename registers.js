@@ -104,18 +104,36 @@ const STRING = [
 ];
 
 const TYPES = {
-  hybrid: { label: 'Hybrid mit Batterie (SH-RT)', map: HYBRID },
-  string: { label: 'Stringwechselrichter (SG-RT)', map: STRING }
+  hybrid: { label: 'Hybrid mit Batterie', map: HYBRID },
+  string: { label: 'Stringwechselrichter', map: STRING }
 };
+
+/* Modelle für das Auswahlmenü. Alle Sungrow-Hybride (SH) nutzen die Registerfamilie 13xxx/33xxx, alle Sungrow-Strings
+   (SG) die Familie 5xxx; die Modelle unterscheiden sich für die Steuerung vor allem in Nennleistung und Phasenzahl.
+   overrides: abweichende Adressen je Modell (Schlüssel → Adresse), bleiben leer, solange nichts anderes belegt ist.
+   Mikrowechselrichter bietet Sungrow nicht an; die kleinsten Geräte sind die einphasigen SG-RS. */
+const MODELS = [
+  { group: 'Hybrid dreiphasig SH-RT', items: [['sh5.0rt', 'SH5.0RT', 5000], ['sh6.0rt', 'SH6.0RT', 6000], ['sh8.0rt', 'SH8.0RT', 8000], ['sh10rt', 'SH10RT', 10000]], type: 'hybrid', phases: 3 },
+  { group: 'Hybrid dreiphasig SH-T (ab 2023)', items: [['sh5t', 'SH5T', 5000], ['sh6t', 'SH6T', 6000], ['sh8t', 'SH8T', 8000], ['sh10t', 'SH10T', 10000], ['sh15t', 'SH15T', 15000], ['sh20t', 'SH20T', 20000], ['sh25t', 'SH25T', 25000]], type: 'hybrid', phases: 3 },
+  { group: 'Hybrid einphasig SH-RS', items: [['sh3.0rs', 'SH3.0RS', 3000], ['sh3.6rs', 'SH3.6RS', 3680], ['sh4.0rs', 'SH4.0RS', 4000], ['sh5.0rs', 'SH5.0RS', 5000], ['sh6.0rs', 'SH6.0RS', 6000]], type: 'hybrid', phases: 1 },
+  { group: 'String dreiphasig SG-RT', items: [['sg3.0rt', 'SG3.0RT', 3000], ['sg4.0rt', 'SG4.0RT', 4000], ['sg5.0rt', 'SG5.0RT', 5000], ['sg6.0rt', 'SG6.0RT', 6000], ['sg7.0rt', 'SG7.0RT', 7000], ['sg8.0rt', 'SG8.0RT', 8000], ['sg10rt', 'SG10RT', 10000], ['sg12rt', 'SG12RT', 12000], ['sg15rt', 'SG15RT', 15000], ['sg17rt', 'SG17RT', 17000], ['sg20rt', 'SG20RT', 20000]], type: 'string', phases: 3 },
+  { group: 'String einphasig SG-RS', items: [['sg2.0rs', 'SG2.0RS', 2000], ['sg2.5rs', 'SG2.5RS', 2500], ['sg3.0rs', 'SG3.0RS', 3000], ['sg3.6rs', 'SG3.6RS', 3680], ['sg4.0rs', 'SG4.0RS', 4000], ['sg5.0rs', 'SG5.0RS', 5000], ['sg6.0rs', 'SG6.0RS', 6000]], type: 'string', phases: 1 },
+  { group: 'String gewerblich SG-CX', items: [['sg33cx', 'SG33CX', 33000], ['sg40cx', 'SG40CX', 40000], ['sg50cx', 'SG50CX', 50000], ['sg110cx', 'SG110CX', 110000]], type: 'string', phases: 3 },
+  { group: 'Sonstige', items: [['other-hybrid', 'Anderer Hybrid (Register selbst prüfen)', 10000], ['other-string', 'Anderer Stringwechselrichter (Register selbst prüfen)', 10000]], type: null, phases: 3 }
+];
+const MODEL_INDEX = {};
+MODELS.forEach(function (g) { g.items.forEach(function (it) { MODEL_INDEX[it[0]] = { id: it[0], label: it[1], ratedPower: it[2], type: g.type || (it[0].indexOf('hybrid') >= 0 ? 'hybrid' : 'string'), phases: g.phases, group: g.group, overrides: {} }; }); });
+function modelOf(inv) { const m = inv && MODEL_INDEX[inv.model]; if (m) return m; return inv && inv.type === 'string' ? MODEL_INDEX['sg8.0rt'] : MODEL_INDEX['sh10rt']; }
+function modelList() { return MODELS.map(function (g) { return { group: g.group, type: g.type, phases: g.phases, items: g.items.map(function (it) { return { id: it[0], label: it[1], ratedPower: it[2], type: MODEL_INDEX[it[0]].type }; }) }; }); }
 
 function words(type) { return type === 'u32' || type === 's32' ? 2 : 1; }
 
 /* Karte eines Wechselrichters: Standardkarte seines Typs, Adressen aus inv.registers überschrieben */
 function mapFor(inv) {
-  const t = TYPES[inv && inv.type] || TYPES.hybrid, over = (inv && inv.registers) || {};
+  const t = TYPES[inv && inv.type] || TYPES.hybrid, over = (inv && inv.registers) || {}, mo = modelOf(inv).overrides;
   return t.map.map(function (e) {
-    const a = over[e.key];
-    return Object.assign({}, e, { addr: Number.isInteger(a) && a >= 0 && a <= 65535 ? a : e.addr, words: words(e.type), custom: Number.isInteger(a) && a !== e.addr });
+    const base = Number.isInteger(mo[e.key]) ? mo[e.key] : e.addr, a = over[e.key];
+    return Object.assign({}, e, { addr: Number.isInteger(a) && a >= 0 && a <= 65535 ? a : base, words: words(e.type), custom: Number.isInteger(a) && a !== base, modelAddr: base });
   });
 }
 function addressOf(inv, key) { const e = mapFor(inv).filter(function (x) { return x.key === key; })[0]; return e ? e.addr : null; }
@@ -201,5 +219,5 @@ function cliTarget(dir) {
     webPort: (c.http && c.http.port) || 8787, A: function (key) { return addressOf(m, key); } };
 }
 
-module.exports = { cliTarget: cliTarget, HYBRID: HYBRID, STRING: STRING, TYPES: TYPES, mapFor: mapFor, addressOf: addressOf, makePlan: makePlan, readPlan: readPlan, decodeEntry: decodeEntry,
+module.exports = { cliTarget: cliTarget, HYBRID: HYBRID, STRING: STRING, TYPES: TYPES, MODELS: MODELS, modelOf: modelOf, modelList: modelList, mapFor: mapFor, addressOf: addressOf, makePlan: makePlan, readPlan: readPlan, decodeEntry: decodeEntry,
   normalizeInverters: normalizeInverters, mainInverter: mainInverter };

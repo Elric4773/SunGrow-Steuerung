@@ -904,8 +904,8 @@ server.listen(cfg.http.port, function () {
     return;
   }
   console.log('Sungrow Steuerung läuft auf Port ' + cfg.http.port + (control ? ' (Monitor, Einstellungen, Matching, Anlage)' : ' (nur Monitor und Anlage, Steuerteil abgeschaltet)'));
-  console.log('Hybrid: ' + (cfg.inverter.name || 'Hybrid') + ' ' + cfg.inverter.host + ':' + cfg.inverter.port + ' (Unit ' + cfg.inverter.unitId + ')' + (invMap.some(function (e) { return e.custom; }) ? ', mit eigenen Registeradressen' : ''));
-  strings.forEach(function (st) { console.log('String: ' + st.cfg.name + ' ' + st.cfg.host + ':' + st.port + ' (Unit ' + st.unitId + ')'); });
+  console.log('Hybrid: ' + (cfg.inverter.name || 'Hybrid') + ' (' + R.modelOf(cfg.inverter).label + ') ' + cfg.inverter.host + ':' + cfg.inverter.port + ' (Unit ' + cfg.inverter.unitId + ')' + (invMap.some(function (e) { return e.custom; }) ? ', mit eigenen Registeradressen' : ''));
+  strings.forEach(function (st) { console.log('String: ' + st.cfg.name + ' (' + R.modelOf(st.cfg).label + ') ' + st.cfg.host + ':' + st.port + ' (Unit ' + st.unitId + ')'); });
   if (cfg.winet.enabled) { console.log('Zellwerte: über die Web-Schnittstelle des WiNet-S (' + winetHost() + ':' + cfg.winet.port + ')'); winetLoop(); }
   else if (cfg.battery.enabled) console.log('Batterie: ' + battHost + ':' + cfg.battery.port + ' (Unit ' + cfg.battery.unitId + ')');
   loop();

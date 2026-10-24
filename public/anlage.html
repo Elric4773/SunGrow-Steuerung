@@ -295,7 +295,7 @@ summary{cursor:pointer;font-weight:600}
 var $=function(id){return document.getElementById(id);};
 var esc=function(s){return String(s===undefined||s===null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
 var nf=function(v,d){return v===null||v===undefined||isNaN(v)?'–':Number(v).toLocaleString('de-DE',{minimumFractionDigits:0,maximumFractionDigits:d});};
-var TYPES=null, MAXMOD=8, C=null, orig='', status=null, HPT=[], HPD=[], PLD=null, MTT=[], MTR={}, MTY=[];
+var TYPES=null, MODELS=[], MODEL={}, MAXMOD=8, C=null, orig='', status=null, HPT=[], HPD=[], PLD=null, MTT=[], MTR={}, MTY=[];
 
 function api(path, body){
   var o = body===undefined ? {cache:'no-store'} : {method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'sungrow'},body:JSON.stringify(body)};
@@ -328,10 +328,10 @@ $('logout').onclick=function(){ api('logout',{}).then(function(){ location.reloa
 function loadConfig(){
   api('config').then(function(j){
     if(j._status===401){ show('editor',false); show('bar',false); show('login',true); return; }
-    TYPES=j.types; MAXMOD=j.maxModules||8; C=j.config; HPT=j.heatpumpTypes||[]; HPD=j.heatpumpDefaults||[]; PLD=j.plannerDefaults; MTT=j.meterTemplates||[]; MTR=j.meterRoles||{}; MTY=j.meterTypes||[];
+    TYPES=j.types; MODELS=j.models||[]; MODEL={}; MODELS.forEach(function(g){ g.items.forEach(function(it){ MODEL[it.id]=it; }); }); MAXMOD=j.maxModules||8; C=j.config; HPT=j.heatpumpTypes||[]; HPD=j.heatpumpDefaults||[]; PLD=j.plannerDefaults; MTT=j.meterTemplates||[]; MTR=j.meterRoles||{}; MTY=j.meterTypes||[];
     C.meters=(C.meters||[]).map(function(m){ m.password=''; m._test=null; return m; });
     C.heatpump._test=null; C.heatpump.registers.forEach(function(r){ r.doc=r.doc; });
-    C.inverters.forEach(function(i){ i.registers=fullRegs(i.type,i.registers); i._open=false; i._test=null; });
+    C.inverters.forEach(function(i){ i.model=i.model||(i.type==='string'?'sg8.0rt':'sh10rt'); i.registers=fullRegs(i.type,i.registers); i._open=false; i._test=null; });
     if(!C.inverters.length) C.inverters.push(newInv('hybrid'));
     C.winet.password='';
     orig=snapshot(); show('editor',true); show('bar',true); render();
@@ -340,12 +340,13 @@ function loadConfig(){
 function fullRegs(type, over){ var out={}; TYPES[type].map.forEach(function(d){ out[d.key]=over&&over[d.key]!==undefined?over[d.key]:d.addr; }); return out; }
 function newInv(type){
   var n=C.inverters.filter(function(i){return i.type===type;}).length+1;
-  return { name:type==='hybrid'?(n>1?'Hybrid '+n:'Hybrid'):'String '+n, enabled:true, type:type, host:'', port:502, unitId:1, ratedPower:10600, addToHouseLoad:true, registers:fullRegs(type,{}), _open:false, _test:null };
+  var model=type==='hybrid'?'sh10rt':'sg8.0rt';
+  return { name:type==='hybrid'?(n>1?'Hybrid '+n:'Hybrid'):'String '+n, enabled:true, type:type, model:model, host:'', port:502, unitId:1, ratedPower:MODEL[model]?MODEL[model].ratedPower:10000, addToHouseLoad:true, registers:fullRegs(type,{}), _open:false, _test:null };
 }
 function snapshot(){ return JSON.stringify(payload()); }
 function payload(){
   return { plantName:C.plantName, httpPort:+C.httpPort, pollSeconds:+C.pollSeconds,
-    inverters:C.inverters.map(function(i){ var o={name:i.name,enabled:i.enabled,type:i.type,host:i.host,port:+i.port,unitId:+i.unitId,registers:i.registers}; if(i.type==='hybrid') o.ratedPower=+i.ratedPower; else o.addToHouseLoad=i.addToHouseLoad; return o; }),
+    inverters:C.inverters.map(function(i){ var o={name:i.name,enabled:i.enabled,type:i.type,model:i.model,host:i.host,port:+i.port,unitId:+i.unitId,registers:i.registers}; if(i.type==='hybrid') o.ratedPower=+i.ratedPower; else o.addToHouseLoad=i.addToHouseLoad; return o; }),
     cellSource:C.cellSource, winet:{host:C.winet.host,port:+C.winet.port,username:C.winet.username,password:C.winet.password,intervalSeconds:+C.winet.intervalSeconds,paramAddress:+C.winet.paramAddress,paramCount:+C.winet.paramCount},
     modbusBattery:{host:C.modbusBattery.host,port:+C.modbusBattery.port,unitId:+C.modbusBattery.unitId,cellBlockAddress:+C.modbusBattery.cellBlockAddress},
     moduleCount:+C.moduleCount, topModuleIndex:+C.topModuleIndex, targetModule:+C.targetModule, moduleNotes:C.moduleNotes,
@@ -523,17 +524,17 @@ function renderInvs(){
     var el=document.createElement('div'); el.className='inv'+(inv.enabled?'':' off');
     var isMain = inv.type==='hybrid' && inv.enabled && activeHybrids===1;
     el.innerHTML=
-      '<div class="ih"><h3>'+esc(inv.name||'(ohne Namen)')+'</h3><span class="tag'+(isMain?' main':'')+'">'+esc(TYPES[inv.type].label)+(isMain?', führt Batterie und Matching':'')+'</span>'+
+      '<div class="ih"><h3>'+esc(inv.name||'(ohne Namen)')+'</h3><span class="tag'+(isMain?' main':'')+'">'+esc(MODEL[inv.model]?MODEL[inv.model].label:TYPES[inv.type].label)+(isMain?', führt Batterie und Matching':'')+'</span>'+
       '<label class="chk"><input type="checkbox" data-k="enabled"'+(inv.enabled?' checked':'')+'> aktiv</label>'+
       '<div class="acts"><button class="b" type="button" data-a="test">Verbindung testen</button><button class="b danger" type="button" data-a="del">Entfernen</button></div></div>'+
       '<div class="grid">'+
         '<label class="f"><span>Name</span><input type="text" maxlength="40" data-k="name" value="'+esc(inv.name)+'"></label>'+
-        '<label class="f"><span>Typ</span><select data-k="type"><option value="hybrid"'+(inv.type==='hybrid'?' selected':'')+'>'+esc(TYPES.hybrid.label)+'</option><option value="string"'+(inv.type==='string'?' selected':'')+'>'+esc(TYPES.string.label)+'</option></select></label>'+
+        '<label class="f"><span>Modell</span><select data-k="model">'+MODELS.map(function(g){ return '<optgroup label="'+esc(g.group)+'">'+g.items.map(function(it){ return '<option value="'+esc(it.id)+'"'+(inv.model===it.id?' selected':'')+'>'+esc(it.label)+'</option>'; }).join('')+'</optgroup>'; }).join('')+'</select><small>'+esc(TYPES[inv.type].label)+(MODEL[inv.model]&&MODELS.filter(function(g){return g.items.some(function(x){return x.id===inv.model;});})[0].phases===1?', einphasig':'')+'</small></label>'+
         '<label class="f"><span>IP-Adresse oder Hostname</span><input type="text" data-k="host" placeholder="z. B. WiNet-S des Geräts" value="'+esc(inv.host)+'"><small>die Adresse des WiNet-S an diesem Gerät</small></label>'+
         '<label class="f"><span>Modbus-Port</span><input type="number" min="1" max="65535" data-k="port" value="'+esc(inv.port)+'"><small>Standard 502</small></label>'+
         '<label class="f"><span>Geräteadresse (Unit)</span><input type="number" min="0" max="247" data-k="unitId" value="'+esc(inv.unitId)+'"><small>Standard 1</small></label>'+
         (inv.type==='hybrid'
-          ? '<label class="f"><span>Nennleistung, Watt</span><input type="number" min="1000" max="50000" step="100" data-k="ratedPower" value="'+esc(inv.ratedPower)+'"><small>Obergrenze der Leistungsregler, z. B. 10600 bei einem 10-kW-Hybrid</small></label>'
+          ? '<label class="f"><span>Nennleistung, Watt</span><input type="number" min="1000" max="50000" step="100" data-k="ratedPower" value="'+esc(inv.ratedPower)+'"><small>Obergrenze der Leistungsregler; wird vom Modell vorbelegt</small></label>'
           : '<label class="chk" style="align-self:end;padding-bottom:22px"><input type="checkbox" data-k="addToHouseLoad"'+(inv.addToHouseLoad?' checked':'')+'> Leistung zum Hausverbrauch addieren</label>')+
       '</div>'+
       '<div class="res" data-r="res"></div>'+
@@ -551,7 +552,7 @@ function renderInvs(){
         if(f.type==='checkbox') inv[k]=f.checked;
         else if(f.type==='number') inv[k]=f.value===''?'':Number(f.value);
         else inv[k]=f.value;
-        if(k==='type'){ inv.registers=fullRegs(inv.type,{}); inv._test=null; renderInvs(); }
+        if(k==='model'){ var md=MODEL[inv.model]; if(md){ var oldType=inv.type; inv.type=md.type; if(oldType!==inv.type) inv.registers=fullRegs(inv.type,{}); if(inv.type==='hybrid') inv.ratedPower=md.ratedPower; } inv._test=null; renderInvs(); }
         else if(k==='enabled') renderInvs();
         else if(k==='name') el.querySelector('h3').textContent=inv.name||'(ohne Namen)';
         changed();
@@ -596,7 +597,7 @@ function renderTest(inv, el){
 }
 function testInv(inv, el, btn){
   btn.disabled=true; inv._test={pending:true}; renderTest(inv,el);
-  api('test',{inverter:{type:inv.type,host:inv.host,port:+inv.port,unitId:+inv.unitId,registers:inv.registers}}).then(function(j){
+  api('test',{inverter:{type:inv.type,model:inv.model,host:inv.host,port:+inv.port,unitId:+inv.unitId,registers:inv.registers}}).then(function(j){
     inv._test=j; inv._open = inv._open || !!j.rows; renderInvs();
   }).catch(function(e){ inv._test={ok:false,error:e.message}; renderTest(inv,el); }).then(function(){ btn.disabled=false; });
 }

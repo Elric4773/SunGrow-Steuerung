@@ -4,6 +4,9 @@ Sungrow Steuerung – (C) by Elric M. – nur private Nutzung zu Test- und Lernz
 
 ## 1.3 – 24.10.2026
 
+**Wechselrichter**
+- Modellauswahl aus allen Sungrow-Reihen (SH-RT, SH-T, SH-RS, SG-RT, SG-RS, SG-CX) mit vorbelegter Nennleistung und Registerkarte.
+
 **Messgeräte**
 - Neuer Abschnitt „Messgeräte“ auf der Seite Anlage: Leistungsmesser mit Rolle (Haus, Wärmepumpe, E-Auto, Verbraucher)
   und drei Quellen: Modbus (TCP oder RTU über TCP, Vorlagen für Eastron SDM630/SDM120/SDM72), Loxone Miniserver

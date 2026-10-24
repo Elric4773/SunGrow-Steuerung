@@ -60,7 +60,7 @@ Je Gerät:
 | Feld | Bedeutung |
 |---|---|
 | Name | frei wählbar, erscheint im Monitor |
-| Typ | Hybrid mit Batterie (SH-RT) oder Stringwechselrichter (SG-RT) |
+| Modell | Auswahl aus allen Sungrow-Reihen: SH-RT, SH-T, SH-RS (Hybride), SG-RT, SG-RS, SG-CX (Strings) oder „Anderes Gerät“. Das Modell legt Typ, Nennleistung und Registerkarte fest. Mikrowechselrichter hat Sungrow nicht im Programm. |
 | aktiv | ausgeschaltete Geräte bleiben gespeichert, werden aber nicht abgefragt |
 | IP-Adresse oder Hostname | Adresse des WiNet-S bzw. des Wechselrichters |
 | Modbus-Port | Standard 502 |

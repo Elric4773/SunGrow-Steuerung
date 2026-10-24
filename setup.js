@@ -74,7 +74,7 @@ const MAX_MODULES = 8;   // der Zellblock des SBR enthält Plätze für 8 Module
 function publicConfig() {
   const c = ctx.cfg, f = readFileConfig();
   const invs = R.normalizeInverters(f).map(function (i) {
-    return { name: i.name || '', enabled: i.enabled !== false, type: i.type === 'string' ? 'string' : 'hybrid', host: i.host || '', port: i.port || 502, unitId: i.unitId || 1,
+    return { name: i.name || '', enabled: i.enabled !== false, type: i.type === 'string' ? 'string' : 'hybrid', model: R.modelOf(i).id, host: i.host || '', port: i.port || 502, unitId: i.unitId || 1,
       ratedPower: i.ratedPower || 10600, addToHouseLoad: i.type === 'string' ? i.addToHouseLoad !== false : undefined, registers: i.registers || {} };
   });
   return {
@@ -127,22 +127,22 @@ function validate(body) {
   const pollSeconds = int(b.pollSeconds, 5, 300); if (pollSeconds === null) err.push('Messintervall: 5 bis 300 Sekunden');
   const names = {};
   const invs = (Array.isArray(b.inverters) ? b.inverters : []).slice(0, 12).map(function (i, n) {
-    const tag = 'Wechselrichter ' + (n + 1), type = i.type === 'string' ? 'string' : 'hybrid';
+    const tag = 'Wechselrichter ' + (n + 1), model = R.modelOf({ model: i.model, type: i.type }), type = model.type;
     const name = String(i.name || '').trim().slice(0, 40);
     if (!name) err.push(tag + ': Name fehlt');
     else if (names[name.toLowerCase()]) err.push(tag + ': Name „' + name + '“ ist doppelt'); else names[name.toLowerCase()] = true;
     const host = cleanHost(i.host); if (!host) err.push((name || tag) + ': IP-Adresse oder Hostname fehlt oder ist ungültig');
     const port = int(i.port, 1, 65535); if (port === null) err.push((name || tag) + ': Port 1 bis 65535');
     const unitId = int(i.unitId, 0, 247); if (unitId === null) err.push((name || tag) + ': Geräteadresse 0 bis 247');
-    const out = { name: name, enabled: i.enabled !== false, type: type, host: host || '', port: port || 502, unitId: unitId === null ? 1 : unitId, registers: {} };
-    if (type === 'hybrid') { const rp = int(i.ratedPower, 1000, 50000); if (rp === null) err.push((name || tag) + ': Nennleistung 1000 bis 50000 W'); out.ratedPower = rp || 10600; }
+    const out = { name: name, enabled: i.enabled !== false, type: type, model: model.id, host: host || '', port: port || 502, unitId: unitId === null ? 1 : unitId, registers: {} };
+    if (type === 'hybrid') { const rp = int(i.ratedPower, 1000, 200000); if (rp === null) err.push((name || tag) + ': Nennleistung 1000 bis 200000 W'); out.ratedPower = rp || model.ratedPower; }
     else out.addToHouseLoad = i.addToHouseLoad !== false;
-    const defs = R.TYPES[type].map, regs = i.registers || {};
+    const defs = R.mapFor({ type: type, model: model.id }), regs = i.registers || {};
     defs.forEach(function (d) {
       if (regs[d.key] === undefined || regs[d.key] === '' || regs[d.key] === null) return;
       const a = int(regs[d.key], 0, 65535);
       if (a === null) err.push((name || tag) + ': Register „' + d.label + '“ braucht eine Adresse von 0 bis 65535');
-      else if (a !== d.addr) out.registers[d.key] = a;      // gespeichert werden nur Abweichungen von der Standardkarte
+      else if (a !== d.modelAddr) out.registers[d.key] = a;      // gespeichert werden nur Abweichungen von der Modellkarte
     });
     return out;
   });
@@ -369,14 +369,14 @@ function handle(req, res, url) {
 
   if (!loggedIn(req)) { sendJson(res, 401, { error: 'Nicht angemeldet.' }); return true; }
 
-  if (what === 'config') { sendJson(res, 200, { config: publicConfig(), types: typeInfo(), maxModules: MAX_MODULES, meterTemplates: MT.TEMPLATES, meterRoles: MT.ROLES, meterTypes: MT.TYPES, heatpumpTypes: Object.keys(HP.TYPES).map(function (k) { return { id: k, label: HP.TYPES[k].label }; }), heatpumpDefaults: heatpumpDefaults().map(function (e) { return { key: e.key, doc: e.doc, type: e.type, scale: e.scale, on: e.on }; }), plannerDefaults: PL.DEFAULTS }); return true; }
+  if (what === 'config') { sendJson(res, 200, { config: publicConfig(), types: typeInfo(), models: R.modelList(), maxModules: MAX_MODULES, meterTemplates: MT.TEMPLATES, meterRoles: MT.ROLES, meterTypes: MT.TYPES, heatpumpTypes: Object.keys(HP.TYPES).map(function (k) { return { id: k, label: HP.TYPES[k].label }; }), heatpumpDefaults: heatpumpDefaults().map(function (e) { return { key: e.key, doc: e.doc, type: e.type, scale: e.scale, on: e.on }; }), plannerDefaults: PL.DEFAULTS }); return true; }
 
   if (what === 'test' && post) {
     readBody(req, 50000, function (j) {
       const i = j.inverter || {}, host = cleanHost(i.host), port = int(i.port, 1, 65535), unitId = int(i.unitId, 0, 247);
       if (!host || port === null || unitId === null) return sendJson(res, 200, { ok: false, error: 'Adresse, Port oder Geräteadresse ungültig.' });
       const regs = {}; Object.keys(i.registers || {}).forEach(function (k) { const n = int(i.registers[k], 0, 65535); if (n !== null) regs[k] = n; });
-      const inv = { type: i.type === 'string' ? 'string' : 'hybrid', host: host, port: port, unitId: unitId, registers: regs };
+      const inv = { type: R.modelOf({ model: i.model, type: i.type }).type, model: i.model, host: host, port: port, unitId: unitId, registers: regs };
       ctx.testInverter(inv).then(function (r) { sendJson(res, 200, r); }, function (e) { sendJson(res, 200, { ok: false, error: e.message }); });
     });
     return true;
