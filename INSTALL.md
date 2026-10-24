@@ -15,6 +15,7 @@ Linux-Server oder Windows-PC.
 | Feste IP-Adresse des WiNet-S | Im Router eine feste Zuordnung (DHCP-Reservierung) einrichten. |
 | Zugangsdaten der WiNet-S-Weboberfläche | Nur für die Zellspannungen nötig. |
 | optional: Stringwechselrichter SG-RT | ebenfalls per Modbus TCP, eigene IP-Adresse. |
+| optional: Mikrowechselrichter S1600S | Modbus TCP über das WLAN des Geräts, Port 502, Unit 1. |
 | optional: Wärmepumpe | RS485-Ethernet-Umsetzer am BMS-Anschluss des Reglers (Carel pCO5+: Klemme J25 BMS2, Tx/Rx+ und Tx/Rx−, GND), Umsetzer im transparenten Betrieb mit den seriellen Einstellungen des Reglers. |
 | optional: Planer | Internetzugang des Rechners für Börsenpreise und Wetter. |
 

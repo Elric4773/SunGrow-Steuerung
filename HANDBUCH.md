@@ -53,7 +53,11 @@ anderen Seiten leiten auf `/anlage` um.
 
 Es gibt **genau einen aktiven Hybridwechselrichter**. Er liefert Batterie, Hausverbrauch und Netzbezug
 und ist das Gerät, auf das Einstellungen und Matching schreiben. Dazu können **beliebig viele
-Stringwechselrichter** kommen, deren Leistung im Monitor als „Solar gesamt“ mitgezählt wird.
+Stringwechselrichter** kommen, deren Leistung im Monitor als „Solar gesamt“ mitgezählt wird – und ebenso
+**Mikrowechselrichter der S-Serie** (S1600S): Sie sprechen Modbus TCP über ihr eingebautes WLAN (Port 502, Unit 1)
+und haben eine eigene Registerkarte, die beim Modell vorbelegt ist. Für die Steuerung zählen sie wie Strings: Leistung
+zu Solar und, hinter dem Zähler des Hybrids, zum Hausverbrauch; der Tagesertrag wird aus dem Gesamtzähler seit
+Mitternacht gebildet (`data/tagesstand.json`), weil die Geräte kein Tagesregister haben.
 
 Je Gerät:
 
@@ -104,6 +108,9 @@ obere/untere Ladegrenze 13057/13058, Notstromreserve 13099, Einspeisebegrenzung 
 größte Lade-/Entladeleistung 33046/33047, Zeitfenster 33207–33218.
 
 Für Stringwechselrichter: AC-Leistung 5030 (u32), DC-Leistung 5016, Tagesertrag 5002, Gesamtertrag 5003.
+
+Für Mikrowechselrichter S-Serie: AC-Leistung 5231 (u16), DC-Leistung 5235, Gesamtertrag 5227 (u32, 0,1 kWh),
+Betriebszustand 5220, PV1–PV4 Spannung/Strom 5332–5339, MPPT-Leistungen 5643/5645/5647/5649 (u32), Nennleistung 5622.
 
 > **Vorsicht.** Eine falsche Adresse bei den Holding-Registern bedeutet, dass beim Schreiben ein
 > anderes Register verändert wird. Adressen der Einstellungen nur ändern, wenn die richtige Adresse
@@ -167,6 +174,32 @@ Drei **Quellen** stehen zur Wahl:
 
 „Wert lesen“ fragt das Gerät sofort ab. Faktor und „Vorzeichen umdrehen“ rechnen den Wert in Watt mit positivem
 Verbrauch um. Passwörter werden nie an den Browser zurückgegeben; ein leeres Feld behält das gespeicherte.
+
+**Energiefluss – Quellen wählen.** Der Abschnitt „Energiefluss“ darunter legt fest, woher die Grafik „Energiefluss
+jetzt“ (Seite Planer) ihre Werte nimmt, und zeigt die Wahl sofort als Vorschau mit den aktuellen Messwerten:
+
+| Knoten | Wahl |
+|---|---|
+| Haus | Automatisch (Messgerät mit Rolle Haus, sonst Wechselrichter), Wechselrichter, oder ein bestimmtes Messgerät |
+| Wärmepumpe | Automatisch (Messgerät mit Rolle Wärmepumpe, sonst Regler), Wärmepumpenregler (Kapitel 2.8), ein bestimmtes Messgerät, oder nicht anzeigen |
+| E-Auto | Automatisch (Messgerät mit Rolle E-Auto), ein bestimmtes Messgerät, oder nicht anzeigen |
+
+Vorsicht bei „Haus“: Ein Zähler am Hausanschluss misst den Austausch mit dem Netz, nicht den Verbrauch – seit der
+PV-Anlage steht er bei Eigenversorgung nahe null. Dann beim Wechselrichter bleiben; der rechnet den Hausverbrauch aus
+seinem eigenen Zähler richtig.
+
+**Zählertest.** Bevor man Zähler zuordnet, lohnt ein Blick, ob sie das messen, was ihr Name verspricht. Das kleine
+Konsolenwerkzeug `zaehlertest.js` liest Messgeräte am Loxone Miniserver und daneben die Werte des Wechselrichters aus
+der laufenden Steuerung im Takt, mit der Änderung seit dem Start:
+
+```sh
+node zaehlertest.js --loxone 192.0.2.15:8080 --user NAME --pass GEHEIM --objekt Zaehler_WP,Zaehler_Wallbox
+```
+
+Einen bekannten Verbraucher einschalten (Wasserkocher ≈ 2 kW) und schauen, welche Spalte springt. Springt die
+Wechselrichter-Hauslast, aber kein Zähler, hängt der Zähler an einem Teilkreis oder am Hausanschluss. Das Werkzeug
+schreibt nichts und gibt bewusst nur ASCII aus, damit auch die NAS-Konsole es sauber anzeigt. Ohne laufende Steuerung
+lässt sich der Wechselrichter mit `--wr IP` direkt abfragen (der WiNet-S erlaubt nur eine Modbus-Verbindung).
 
 ### 2.8 Wärmepumpe
 
@@ -254,7 +287,7 @@ schnell zwischen Hell und Dunkel.
 - **Kopfzeile** – Betriebszustand und Betriebsart, Zeit der letzten Messung, Knopf „WiNet-S freigeben“.
 - **Batterieturm** – Ladezustand, Spannung, Strom, Leistung, Temperatur. Darunter jedes Modul mit
   niedrigster und höchster Zellspannung und seiner Spreizung. Unten die **Spreizung über alle Zellen**.
-- **Leistungsfluss** – Solar gesamt (Hybrid plus alle aktiven Stringwechselrichter), Batterie, Netz, Haus.
+- **Leistungsfluss** – Solar gesamt (Hybrid plus alle aktiven String- und Mikrowechselrichter), Batterie, Netz, Haus.
 - **Module im Vergleich** – Zellspannung je Modul und Abstand jedes Moduls zum Median des Turms.
 - **Verlauf** – Leistung, Ladezustand und Spreizung der letzten Tage.
 - **Energie** – Tageswerte für PV je Wechselrichter, Batterie, Netz und Eigenverbrauch.
@@ -419,6 +452,7 @@ Wärme.
 Die Kachel **Energiefluss jetzt** zeigt die Messwerte als Knoten (Solar, Netz, Batterie, Haus, Wärmepumpe,
 E-Auto) mit laufenden Linien in Richtung des Stromflusses; die Dicke entspricht der Leistung. Haus, Wärmepumpe
 und E-Auto nehmen die Werte der Messgeräte (Kapitel 2.7), sofern eingerichtet; das E-Auto bleibt sonst ausgegraut.
+Welche Quelle je Knoten gilt, lässt sich auf der Seite Anlage im Abschnitt „Energiefluss“ wählen, mit Vorschau.
 
 
 
@@ -478,6 +512,8 @@ Jede Antwort trägt die Kopfzeile `X-Build` mit der Kennung des Programmstands.
 | `modbus-client.js` | Modbus TCP und RTU über TCP |
 | `heatpump.js` | Wärmepumpe: Registerkarte, Lesen, Weißliste fürs Schreiben |
 | `meters.js` | Messgeräte: Modbus, Loxone, HTTP/JSON |
+| `public/flow.js` | Energiefluss-Grafik mit Quellenwahl, gemeinsam für Planer und Anlage |
+| `zaehlertest.js` | Konsolenwerkzeug zum Prüfen von Zählern (Kapitel 2.7) |
 | `prices.js`, `forecast.js`, `web.js` | Strompreis, Wetter und PV-Prognose |
 | `planner.js` | Fahrplan für Batterie und Wärmepumpe |
 | `check.js`, `ems.js`, `modbus.js` | Konsolenwerkzeuge |

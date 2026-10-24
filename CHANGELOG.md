@@ -2,6 +2,32 @@
 
 Sungrow Steuerung – (C) by Elric M. – nur private Nutzung zu Test- und Lernzwecken, siehe LICENSE.
 
+## 1.3.1 – 24.10.2026
+
+**Wechselrichter**
+- Mikrowechselrichter der S-Serie (S1600S) als eigener Gerätetyp mit eigener Registerkarte (52xx/53xx/56xx, Modbus TCP
+  über das WLAN des Geräts). Zählt wie ein String zu Solar und Hausverbrauch; Tagesertrag aus dem Gesamtzähler seit
+  Mitternacht. Danke an die Registerliste aus dem Forum.
+
+**Messgeräte**
+- Neue Rolle „Erzeuger“ für Mikrowechselrichter und andere Erzeugung, die der Hybridwechselrichter nicht kennt
+  (z. B. Sungrow S1600S, nur per Cloud erreichbar): ein Shelly, SDM120 oder Loxone-Zähler an deren Leitung liefert die
+  Leistung; sie kommt zu Solar **und** zum Hausverbrauch dazu, weil der Hybrid fremde Einspeisung als eigene verbucht
+  und seine Hauslast sonst zu niedrig ausweist.
+- Tagesenergie je Messgerät wird mitgezählt und in `data/messgeraete-tag.json` gemerkt (überlebt Neustarts); bei
+  Erzeugern fließt sie in „Solar heute“ und ins Lernen der PV-Prognose.
+- Monitor zeigt den Erzeuger-Anteil unter „Solar gesamt“, der Energiefluss im Planer am Solar-Knoten.
+
+**Energiefluss**
+- Neuer Abschnitt „Energiefluss“ auf der Seite Anlage: Quelle je Knoten wählbar (Haus, Wärmepumpe, E-Auto – automatisch,
+  Wechselrichter, Regler, bestimmtes Messgerät oder ausblenden) mit Live-Vorschau der Grafik, die die Wahl sofort zeigt.
+- Grafik in `public/flow.js` zusammengeführt (Planer und Anlage zeichnen dieselbe).
+- Haus-Knoten zeigt den Verbrauch ohne Wärmepumpe und E-Auto, die Summe steht klein darunter.
+
+**Werkzeuge**
+- `zaehlertest.js`: Konsolenwerkzeug, das Loxone-Zähler und Wechselrichterwerte im Takt nebeneinander zeigt, um
+  vertauschte oder falsch sitzende Zähler zu erkennen.
+
 ## 1.3 – 24.10.2026
 
 **Wechselrichter**
@@ -14,8 +40,6 @@ Sungrow Steuerung – (C) by Elric M. – nur private Nutzung zu Test- und Lernz
 - Gemessene Werte haben Vorrang: Haus ersetzt den gerechneten Hausverbrauch, Wärmepumpe fließt in die gelernte
   Heizlast, E-Auto wird aus dem Lastprofil herausgerechnet.
 - Energiefluss zeigt E-Auto als Knoten, freie Verbraucher als Liste.
-- Rolle „Erzeuger“ für Mikrowechselrichter und andere Erzeugung, die der Hybrid nicht kennt: Leistung kommt zu Solar
-  und zum Hausverbrauch dazu, Tagesenergie wird mitgezählt (`data/messgeraete-tag.json`).
 
 **Planer**
 - Horizont bis 72 Stunden; unbekannte Preise werden aus dem Wochentagsmuster geschätzt (vier Wochen, Ersatz sieben Tage).

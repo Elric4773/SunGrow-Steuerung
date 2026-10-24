@@ -84,6 +84,7 @@ a.plain{color:var(--ink)}
 </style>
 <link rel="stylesheet" href="/skins.css">
 <script src="/skins.js"></script>
+<script src="/flow.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -291,50 +292,24 @@ function renderSaving(){
     '<span>davon Batterie</span><span class="n">'+nf(t.savingEur,2)+' € ('+t.moves+' Eingriffe)</span>'+(D.params.heat.enabled?'<span>davon Wärmepumpe</span><span class="n">'+nf(t.heatSavingEur,2)+' € ('+nf(t.heatMovedKwh,1)+' kWh verschoben)</span>':'')+
     '<span>Verbrauch / PV erwartet</span><span class="n">'+nf(t.loadKwh,0)+' / '+nf(t.pvKwh,0)+' kWh</span>'+(days.length>1?'<span>Summe der Pläne, '+days.length+' Tage</span><span class="n">'+nf(sum,2)+' €</span>':'');
 }
-/* Energiefluss: Solar, Netz, Batterie, Haus, Wärmepumpe, E-Auto als Knoten; Linien fließen in Richtung der Energie */
+/* Energiefluss: Grafik und Quellenwahl liegen in flow.js (gemeinsam mit der Seite Anlage) */
 function renderHp(){
-  var svg=$('flow'), h=D.heatpump, inv=LIVE&&LIVE.live?LIVE.live:null;
-  var pv=inv?inv.plant.pvPower:0, grid=inv?inv.inverter.gridPower:0, bat=inv?inv.inverter.battery.power:0, house=inv?inv.plant.loadPower:0, soc=inv?inv.inverter.battery.soc:null;
-  var hv=h&&h.live?h.live.values:{}, hpFresh=h&&h.live&&Date.now()-h.at<10*60000;
-  var M=(LIVE&&LIVE.meters)||[], sumRole=function(r){ var l=M.filter(function(x){return x.role===r&&x.fresh;}); return l.length?l.reduce(function(a,x){return a+x.watts;},0):null; };
-  var mHouse=sumRole('house'), mHp=sumRole('heatpump'), carW=sumRole('car'), pvX=sumRole('pv');
-  if(mHouse!==null) house=mHouse+(pvX||0);   // gemessener Hauszähler sitzt meist vor den Erzeugern: deren Leistung kommt dazu
-  var hpW = mHp!==null ? mHp : (hpFresh&&hv.elPower!==undefined ? hv.elPower : (hpFresh&&h&&h.live.running ? (D.totals&&D.totals.heat?Math.max(600,D.totals.heat.wattsPerKelvin*Math.max(1,D.params.heat.limitTemp-(hv.outdoorTemp||5))):1500) : 0));
-  var hpEst = mHp===null && hpFresh && hv.elPower===undefined && hpW>0;
-  var hasHpNode = !!h || mHp!==null;
-  var kw=function(w){ return nf(Math.abs(w)/1000,Math.abs(w)<10000?2:1)+' kW'; };
-  var N={ solar:{x:70,y:48,c:'var(--pv)',t:'Solar',v:(pv>0?kw(pv):'–')+(pvX?' · '+kw(pvX)+' Erz.':'')}, grid:{x:290,y:48,c:'var(--grid)',t:'Netz',v:grid?kw(grid)+(grid>0?' Bezug':' Einsp.'):'0 kW'},
-          house:{x:180,y:150,c:'var(--ink)',t:'Haus',v:kw(house)}, batt:{x:70,y:245,c:'var(--batt)',t:'Batterie',v:(soc!==null?nf(soc,0)+' %':'–')+(bat?' · '+kw(bat)+(bat>0?' lädt':' entlädt'):'')},
-          hp:{x:290,y:245,c:'var(--heat)',t:'Wärme-\npumpe',v:hasHpNode?(mHp!==null?kw(hpW):(hpFresh?(hpW>0?(hpEst?'≈ ':'')+kw(hpW):'steht'):'keine Werte')):'nicht eingerichtet'}, car:{x:180,y:258,c:'var(--muted)',t:'E-Auto',v:carW===null?'nicht gemessen':kw(carW)} };
-  var out='<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>';
-  var edge=function(a,b,w,color){ if(!(Math.abs(w)>20)) return ''; var from=w>0?N[a]:N[b], to=w>0?N[b]:N[a]; var sw=Math.max(2,Math.min(10,Math.abs(w)/800));
-    var mx=(from.x+to.x)/2, my=(from.y+to.y)/2, dx=to.x-from.x, dy=to.y-from.y, len=Math.hypot(dx,dy), ux=dx/len, uy=dy/len;
-    var x1=from.x+ux*34, y1=from.y+uy*34, x2=to.x-ux*36, y2=to.y-uy*36;
-    return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+color+'" stroke-width="'+(sw+4)+'" opacity=".18" stroke-linecap="round"/>'+
-           '<line class="flowline" x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+color+'" stroke-width="'+sw+'" stroke-dasharray="10 14" stroke-linecap="round" style="color:'+color+'" marker-end="url(#arr)"/>'; };
-  // Flüsse: Solar → Haus (was nicht in Batterie/Netz geht), Netz ↔ Haus, Batterie ↔ Haus, Haus → Wärmepumpe
-  var pvToBat=Math.max(0,Math.min(pv,bat)), pvToGrid=Math.max(0,Math.min(pv-pvToBat,-grid)), pvToHouse=Math.max(0,pv-pvToBat-pvToGrid);
-  out+=edge('solar','house',pvToHouse,'var(--pv)')+edge('solar','batt',pvToBat,'var(--pv)')+edge('solar','grid',pvToGrid,'var(--pv)');
-  out+=edge('grid','house',Math.max(0,grid),'var(--grid)')+edge('batt','house',Math.max(0,-bat),'var(--batt)')+edge('grid','batt',Math.max(0,bat-pvToBat),'var(--grid)');
-  if(hasHpNode&&hpW>0) out+=edge('house','hp',hpW,'var(--heat)');
-  if(carW!==null&&carW>20) out+=edge('house','car',carW,'var(--grid)');
-  Object.keys(N).forEach(function(k){ var o=N[k], dim=(k==='car'&&carW===null)||(k==='hp'&&!hasHpNode);
-    out+='<g class="node" opacity="'+(dim?'.45':'1')+'"><circle cx="'+o.x+'" cy="'+o.y+'" r="30" fill="var(--panel)" stroke="'+o.c+'" stroke-width="3"/>'+
-      (k==='batt'&&soc!==null?'<rect x="'+(o.x-18)+'" y="'+(o.y+10)+'" width="36" height="7" rx="2" fill="var(--track)"/><rect x="'+(o.x-18)+'" y="'+(o.y+10)+'" width="'+(36*soc/100)+'" height="7" rx="2" fill="'+o.c+'"/>':'')+
-      (o.t.indexOf('\n')>=0?'<text x="'+o.x+'" y="'+(o.y-1)+'" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">'+esc(o.t.split('\n')[0])+'</text><text x="'+o.x+'" y="'+(o.y+13)+'" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">'+esc(o.t.split('\n')[1])+'</text>'
-        :'<text x="'+o.x+'" y="'+(o.y+(k==='batt'?2:5))+'" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">'+esc(o.t)+'</text>')+
-      (k==='house'?'<text x="'+(o.x-38)+'" y="'+(o.y+5)+'" text-anchor="end" font-size="14" fill="var(--muted)">'+esc(o.v)+'</text>':'<text x="'+o.x+'" y="'+(o.y+44)+'" text-anchor="middle" font-size="14" fill="var(--muted)">'+esc(o.v)+'</text>')+'</g>'; });
-  svg.innerHTML=out;
+  var h=D.heatpump, hmod=D.totals&&D.totals.heat?{wattsPerKelvin:D.totals.heat.wattsPerKelvin,limitTemp:D.params.heat.limitTemp}:null;
+  var d=Flow.resolve({ flow:LIVE?LIVE.flow:null, live:LIVE, heatpump:h, heatModel:hmod });
+  Flow.render($('flow'), d);
+  var kw=Flow.kw, inv=LIVE&&LIVE.live;
   $('flowSub').textContent=inv?'Messung '+hm(LIVE.lastOk):'keine Messwerte';
-  var box=$('hpBox'), extra=M.filter(function(x){return x.role==='custom';});
-  var extraHtml=extra.length?'<div class="hpkv" style="margin-top:12px">'+extra.map(function(x){ return '<div><span>'+esc(x.name)+'</span><b>'+(x.fresh?kw(x.watts):'–')+'</b></div>'; }).join('')+'</div>':'';
-  if(!h){ box.innerHTML=extraHtml+'<p class="sub" style="margin-top:8px">Keine Wärmepumpe eingerichtet. Auf der Seite <a class="plain" href="/anlage">Anlage</a> lässt sie sich anbinden.</p>'; return; }
+  var box=$('hpBox');
+  var extraHtml=d.extras.length?'<div class="hpkv" style="margin-top:12px">'+d.extras.map(function(x){ return '<div><span>'+esc(x.name)+'</span><b>'+(x.w===null?'–':kw(x.w))+'</b></div>'; }).join('')+'</div>':'';
+  if(!h){ box.innerHTML=extraHtml+'<p class="sub" style="margin-top:8px">'+(d.hp.state==='measured'?'Wärmepumpe gemessen über '+esc(d.hp.name)+'. ':'Keine Wärmepumpe eingerichtet. ')+'Quellen und Regler auf der Seite <a class="plain" href="/anlage">Anlage</a>.</p>'; return; }
+  var hv=h.live?h.live.values:{}, hpFresh=h.live&&Date.now()-h.at<10*60000;
   var html='<div class="hpkv">';
   var rows=[['Außen',hv.outdoorTemp,'°C'],['Vorlauf',hv.flowTemp,'°C'],['Rücklauf',hv.returnTemp,'°C'],['Warmwasser',hv.dhwTemp,'°C'],['Anforderung',hv.demandPct,'%'],['Energie heute',hv.energyToday,'kWh']];
   rows.forEach(function(r){ if(hpFresh&&r[1]!==undefined) html+='<div><span>'+r[0]+'</span><b>'+nf(r[1],r[2]==='°C'?1:0)+' '+r[2]+'</b></div>'; });
   html+='<div><span>Verschiebung</span><b>'+(h.shift===null?'–':shiftText(h.shift))+(D.shift!==h.shift?' → '+shiftText(D.shift):'')+'</b></div>';
   html+='<div><span>Zustand</span><b>'+(hpFresh?esc(h.live.stateText||(h.live.running?'läuft':'steht')):'keine Werte')+'</b></div></div>';
-  if(hpEst) html+='<p class="sub" style="margin-top:8px">Leistung geschätzt, weil das Register „Elektrische Leistung“ nicht eingeschaltet ist.</p>';
+  if(d.hp.state==='estimate') html+='<p class="sub" style="margin-top:8px">Leistung geschätzt, weil das Register „Elektrische Leistung“ nicht eingeschaltet ist.</p>';
+  if(d.hp.state==='measured') html+='<p class="sub" style="margin-top:8px">Leistung vom Zähler '+esc(d.hp.name)+'.</p>';
   if(h.writeError) html+='<p class="chip bad">'+esc(h.writeError)+'</p>';
   box.innerHTML=html+extraHtml;
 }

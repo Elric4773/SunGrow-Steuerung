@@ -39,6 +39,9 @@ button.b{font:inherit;font-size:16px;padding:7px 16px;border:2px solid var(--ink
 button.b.pri{background:var(--ink);color:var(--panel)} button.b.danger{border-color:var(--alert);color:var(--alert)}
 button.b[disabled]{opacity:.4;cursor:default}
 .acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.flowwrap{display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start} @media(max-width:860px){.flowwrap{grid-template-columns:1fr}} .flowwrap .grid{grid-template-columns:1fr}
+.flowprev{border:2px solid var(--line);background:var(--panel);padding:10px} .flowprev svg{display:block;width:100%;height:auto} #flowPrev text{font-family:inherit} .node{filter:drop-shadow(0 6px 10px rgba(0,0,0,.25))}
+@media (prefers-reduced-motion:no-preference){.flowline{animation:dash 1.2s linear infinite}} @keyframes dash{to{stroke-dashoffset:-24}}
 .inv{border:2px solid var(--line);padding:16px 18px;margin-top:14px;background:var(--panel)}
 .inv.off{opacity:.72;border-style:dashed}
 .inv .ih{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:12px}
@@ -74,6 +77,7 @@ summary{cursor:pointer;font-weight:600}
 </style>
 <link rel="stylesheet" href="/skins.css">
 <script src="/skins.js"></script>
+<script src="/flow.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -113,7 +117,7 @@ summary{cursor:pointer;font-weight:600}
     <section class="panel" aria-labelledby="hInv">
       <div class="phead"><div><h2 id="hInv">Wechselrichter</h2>
         <p>Genau ein aktiver Hybridwechselrichter mit Batterie, dazu beliebig viele Stringwechselrichter. Die Register sind mit den Sungrow-Standardadressen vorbelegt und lassen sich je Gerät ändern. „Verbindung testen“ liest alle eingetragenen Register sofort aus, ohne zu speichern.</p></div>
-        <div class="acts"><button class="b" type="button" id="addHybrid">Hybrid hinzufügen</button><button class="b" type="button" id="addString">Stringwechselrichter hinzufügen</button></div></div>
+        <div class="acts"><button class="b" type="button" id="addHybrid">Hybrid hinzufügen</button><button class="b" type="button" id="addString">Stringwechselrichter hinzufügen</button><button class="b" type="button" id="addMicro">Mikrowechselrichter hinzufügen</button></div></div>
       <div id="invs"></div>
     </section>
 
@@ -165,6 +169,15 @@ summary{cursor:pointer;font-weight:600}
         <p>Leistungsmesser für den Energiefluss und das Lernen des Planers: Zähler wie der Eastron SDM630 direkt per Modbus, über einen Loxone Miniserver oder über eine JSON-Schnittstelle (Shelly, Tasmota, Wallbox). Jedes Messgerät bekommt eine Rolle; gemessene Werte haben Vorrang vor gerechneten.</p></div>
         <div class="acts"><button class="b" type="button" id="addMeter">Messgerät hinzufügen</button></div></div>
       <div id="meters"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="hFlow">
+      <div class="phead"><div><h2 id="hFlow">Energiefluss</h2>
+        <p>Woher die Grafik „Energiefluss jetzt“ ihre Werte nimmt. „Automatisch“ nimmt ein Messgerät mit passender Rolle, sonst den Wechselrichter bzw. den Wärmepumpenregler. Die Vorschau zeigt die Wahl sofort mit den aktuellen Messwerten, gespeichert wird sie mit der Leiste unten.</p></div></div>
+      <div class="flowwrap">
+        <div class="grid" id="flowSel"></div>
+        <div class="flowprev"><svg id="flowPrev" viewBox="0 0 360 330" aria-label="Vorschau Energiefluss"></svg><p class="hint" id="flowPrevSub"></p></div>
+      </div>
     </section>
 
     <section class="panel" aria-labelledby="hHp">
@@ -331,7 +344,7 @@ function loadConfig(){
     TYPES=j.types; MODELS=j.models||[]; MODEL={}; MODELS.forEach(function(g){ g.items.forEach(function(it){ MODEL[it.id]=it; }); }); MAXMOD=j.maxModules||8; C=j.config; HPT=j.heatpumpTypes||[]; HPD=j.heatpumpDefaults||[]; PLD=j.plannerDefaults; MTT=j.meterTemplates||[]; MTR=j.meterRoles||{}; MTY=j.meterTypes||[];
     C.meters=(C.meters||[]).map(function(m){ m.password=''; m._test=null; return m; });
     C.heatpump._test=null; C.heatpump.registers.forEach(function(r){ r.doc=r.doc; });
-    C.inverters.forEach(function(i){ i.model=i.model||(i.type==='string'?'sg8.0rt':'sh10rt'); i.registers=fullRegs(i.type,i.registers); i._open=false; i._test=null; });
+    C.inverters.forEach(function(i){ i.model=i.model||(i.type==='string'?'sg8.0rt':i.type==='micro'?'s1600s':'sh10rt'); i.registers=fullRegs(i.type,i.registers); i._open=false; i._test=null; });
     if(!C.inverters.length) C.inverters.push(newInv('hybrid'));
     C.winet.password='';
     orig=snapshot(); show('editor',true); show('bar',true); render();
@@ -340,8 +353,8 @@ function loadConfig(){
 function fullRegs(type, over){ var out={}; TYPES[type].map.forEach(function(d){ out[d.key]=over&&over[d.key]!==undefined?over[d.key]:d.addr; }); return out; }
 function newInv(type){
   var n=C.inverters.filter(function(i){return i.type===type;}).length+1;
-  var model=type==='hybrid'?'sh10rt':'sg8.0rt';
-  return { name:type==='hybrid'?(n>1?'Hybrid '+n:'Hybrid'):'String '+n, enabled:true, type:type, model:model, host:'', port:502, unitId:1, ratedPower:MODEL[model]?MODEL[model].ratedPower:10000, addToHouseLoad:true, registers:fullRegs(type,{}), _open:false, _test:null };
+  var model=type==='hybrid'?'sh10rt':type==='micro'?'s1600s':'sg8.0rt';
+  return { name:type==='hybrid'?(n>1?'Hybrid '+n:'Hybrid'):type==='micro'?'Mikro '+n:'String '+n, enabled:true, type:type, model:model, host:'', port:502, unitId:1, ratedPower:MODEL[model]?MODEL[model].ratedPower:10000, addToHouseLoad:true, registers:fullRegs(type,{}), _open:false, _test:null };
 }
 function snapshot(){ return JSON.stringify(payload()); }
 function payload(){
@@ -350,7 +363,7 @@ function payload(){
     cellSource:C.cellSource, winet:{host:C.winet.host,port:+C.winet.port,username:C.winet.username,password:C.winet.password,intervalSeconds:+C.winet.intervalSeconds,paramAddress:+C.winet.paramAddress,paramCount:+C.winet.paramCount},
     modbusBattery:{host:C.modbusBattery.host,port:+C.modbusBattery.port,unitId:+C.modbusBattery.unitId,cellBlockAddress:+C.modbusBattery.cellBlockAddress},
     moduleCount:+C.moduleCount, topModuleIndex:+C.topModuleIndex, targetModule:+C.targetModule, moduleNotes:C.moduleNotes,
-    meters:C.meters.map(function(m){ var o={}; Object.keys(m).forEach(function(k){ if(k.charAt(0)!=='_'&&k!=='passwordSet') o[k]=m[k]; }); return o; }), heatpump:hpPayload(), prices:C.prices, forecast:{provider:C.forecast.provider,lat:C.forecast.lat,lon:C.forecast.lon,planes:C.forecast.planes,performanceRatio:C.forecast.performanceRatio,urlWeather:C.forecast.urlWeather,urlSolar:C.forecast.urlSolar}, planner:C.planner };
+    meters:C.meters.map(function(m){ var o={}; Object.keys(m).forEach(function(k){ if(k.charAt(0)!=='_'&&k!=='passwordSet') o[k]=m[k]; }); return o; }), flow:{house:C.flow.house,heatpump:C.flow.heatpump,car:C.flow.car}, heatpump:hpPayload(), prices:C.prices, forecast:{provider:C.forecast.provider,lat:C.forecast.lat,lon:C.forecast.lon,planes:C.forecast.planes,performanceRatio:C.forecast.performanceRatio,urlWeather:C.forecast.urlWeather,urlSolar:C.forecast.urlSolar}, planner:C.planner };
 }
 function hpPayload(){ var h=C.heatpump; return { enabled:h.enabled, name:h.name, model:h.model, host:h.host, port:+h.port, unitId:+h.unitId, framing:h.framing, pollSeconds:+h.pollSeconds, writeEnabled:h.writeEnabled, shift:{min:+h.shift.min,max:+h.shift.max},
   registers:h.registers.map(function(r){ return {key:r.key,doc:r.doc,type:r.type,scale:r.scale,on:r.on}; }) }; }
@@ -383,7 +396,7 @@ function render(){
   var nh=''; for(var m=1;m<=+C.moduleCount;m++) nh+='<label class="f"><span>Modul '+m+'</span><input type="text" maxlength="40" data-m="'+m+'" value="'+esc(C.moduleNotes[m]||'')+'"></label>';
   $('notes').innerHTML=nh;
   Array.prototype.forEach.call($('notes').querySelectorAll('input'),function(el){ el.oninput=function(){ var m=el.getAttribute('data-m'); if(el.value.trim()) C.moduleNotes[m]=el.value; else delete C.moduleNotes[m]; changed(); }; });
-  renderMeters(); renderHp(); renderPrices(); renderForecast(); renderPlanner();
+  renderMeters(); renderFlowSel(); renderHp(); renderPrices(); renderForecast(); renderPlanner();
   changed();
 }
 
@@ -420,15 +433,46 @@ function renderMeters(){
     Array.prototype.forEach.call(el.querySelectorAll('[data-k]'),function(f){ var k=f.getAttribute('data-k');
       var upd=function(){ if(f.type==='checkbox') m[k]=f.checked; else if(f.type==='number') m[k]=f.value===''?'':Number(f.value); else m[k]=f.value;
         if(k==='template'){ var t=MTT.filter(function(x){return x.id===m.template;})[0]; if(t&&t.id!=='generic'){ m.doc=t.doc; m.type=t.type; m.unitId=t.unitId; } renderMeters(); }
-        else if(k==='source'||k==='enabled'||k==='role') renderMeters(); else if(k==='name') el.querySelector('h3').textContent=m.name||'(ohne Namen)'; changed(); };
+        else if(k==='source'||k==='enabled'||k==='role') { renderMeters(); renderFlowSel(); } else if(k==='name') { el.querySelector('h3').textContent=m.name||'(ohne Namen)'; renderFlowSel(); } changed(); };
       f.onchange=upd; if(f.tagName==='INPUT'&&f.type!=='checkbox') f.oninput=upd; });
     el.querySelector('[data-a="test"]').onclick=function(){ var b=this; b.disabled=true; m._test={pending:true}; renderMeters();
       var o={}; Object.keys(m).forEach(function(k){ if(k.charAt(0)!=='_'&&k!=='passwordSet') o[k]=m[k]; });
-      api('test-meter',{meter:o}).then(function(j){ m._test=j; renderMeters(); }).catch(function(e){ m._test={ok:false,error:e.message}; renderMeters(); }); };
-    el.querySelector('[data-a="del"]').onclick=function(){ if(window.confirm('Messgerät „'+(m.name||'')+'“ entfernen?')){ C.meters.splice(idx,1); renderMeters(); changed(); } };
+      api('test-meter',{meter:o}).then(function(j){ m._test=j; renderMeters(); renderFlowPrev(); }).catch(function(e){ m._test={ok:false,error:e.message}; renderMeters(); }); };
+    el.querySelector('[data-a="del"]').onclick=function(){ if(window.confirm('Messgerät „'+(m.name||'')+'“ entfernen?')){ C.meters.splice(idx,1); renderMeters(); renderFlowSel(); changed(); } };
   });
 }
-$('addMeter').onclick=function(){ C.meters.push(newMeter()); renderMeters(); changed(); };
+$('addMeter').onclick=function(){ C.meters.push(newMeter()); renderMeters(); renderFlowSel(); changed(); };
+
+/* ---------- Energiefluss: Quellenwahl mit Live-Vorschau ---------- */
+var FLOWLIVE=null, flowTimer=null;
+function renderFlowSel(){
+  C.flow=C.flow||{house:'auto',heatpump:'auto',car:'auto'};
+  var ms=C.meters.filter(function(m){return m.enabled&&m.name;});
+  var opt=function(v,t,cur){ return '<option value="'+esc(v)+'"'+(cur===v?' selected':'')+'>'+esc(t)+'</option>'; };
+  var meterOpts=function(cur,roleHint){ return ms.map(function(m){ return opt('meter:'+m.name, 'Messgerät „'+m.name+'“ ('+(MTR[m.role]||m.role)+')', cur); }).join(''); };
+  var hpName=C.heatpump&&C.heatpump.enabled?(C.heatpump.name||'Wärmepumpe'):null;
+  var h='<label class="f"><span>Haus</span><select data-f="house">'+opt('auto','Automatisch: Messgerät mit Rolle Haus, sonst Wechselrichter',C.flow.house)+opt('inverter','Wechselrichter (Hauslast + Stringwechselrichter)',C.flow.house)+meterOpts(C.flow.house)+'</select><small>Ein Zähler am Hausanschluss misst den Netzaustausch, nicht den Verbrauch – dann beim Wechselrichter bleiben.</small></label>'+
+    '<label class="f"><span>Wärmepumpe</span><select data-f="heatpump">'+opt('auto','Automatisch: Messgerät mit Rolle Wärmepumpe, sonst Regler',C.flow.heatpump)+opt('register','Wärmepumpenregler'+(hpName?' „'+hpName+'“':' (nicht eingerichtet)'),C.flow.heatpump)+meterOpts(C.flow.heatpump)+opt('none','Nicht anzeigen',C.flow.heatpump)+'</select></label>'+
+    '<label class="f"><span>E-Auto</span><select data-f="car">'+opt('auto','Automatisch: Messgerät mit Rolle E-Auto',C.flow.car)+meterOpts(C.flow.car)+opt('none','Nicht anzeigen',C.flow.car)+'</select></label>'+
+    '<p class="hint" id="flowSrcText"></p>';
+  $('flowSel').innerHTML=h;
+  Array.prototype.forEach.call($('flowSel').querySelectorAll('select'),function(f){ f.onchange=function(){ C.flow[f.getAttribute('data-f')]=f.value; changed(); renderFlowPrev(); }; });
+  renderFlowPrev();
+  if(!flowTimer){ flowTimer=setInterval(fetchFlowLive, 10000); fetchFlowLive(); }
+}
+function fetchFlowLive(){ fetch('/api/live',{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){ FLOWLIVE=j; renderFlowPrev(); }).catch(function(){}); }
+function renderFlowPrev(){
+  if(!window.Flow||!$('flowPrev')) return;
+  /* Vorschau mit den noch ungespeicherten Werten: Live-Messwerte, aber Namen/Rollen aus dem Editor */
+  var live=FLOWLIVE?Object.assign({},FLOWLIVE):{meters:[]};
+  var liveM=FLOWLIVE?FLOWLIVE.meters:[];
+  live.meters=C.meters.filter(function(m){return m.enabled&&m.name;}).map(function(m){ var l=liveM.filter(function(x){return x.name===m.name;})[0]; var w=l?l.watts:(m._test&&m._test.ok?m._test.watts:null); return { name:m.name, role:m.role, roleLabel:MTR[m.role]||m.role, watts:w, fresh:w!==null&&(l?l.fresh:true) }; });
+  var d=Flow.resolve({ flow:C.flow, live:live, heatpump:FLOWLIVE?FLOWLIVE.heatpump:null });
+  Flow.render($('flowPrev'), d);
+  var src=Flow.describe(d);
+  $('flowPrevSub').textContent=FLOWLIVE&&FLOWLIVE.live?'Messwerte von '+new Date(FLOWLIVE.lastOk).toLocaleTimeString('de-DE'):'Noch keine Messwerte der Steuerung';
+  $('flowSrcText').textContent='Haus: '+src.house+' · Wärmepumpe: '+src.heatpump+' · E-Auto: '+src.car;
+}
 
 /* ---------- Wärmepumpe ---------- */
 function renderHp(){
@@ -530,7 +574,7 @@ function renderInvs(){
       '<div class="grid">'+
         '<label class="f"><span>Name</span><input type="text" maxlength="40" data-k="name" value="'+esc(inv.name)+'"></label>'+
         '<label class="f"><span>Modell</span><select data-k="model">'+MODELS.map(function(g){ return '<optgroup label="'+esc(g.group)+'">'+g.items.map(function(it){ return '<option value="'+esc(it.id)+'"'+(inv.model===it.id?' selected':'')+'>'+esc(it.label)+'</option>'; }).join('')+'</optgroup>'; }).join('')+'</select><small>'+esc(TYPES[inv.type].label)+(MODEL[inv.model]&&MODELS.filter(function(g){return g.items.some(function(x){return x.id===inv.model;});})[0].phases===1?', einphasig':'')+'</small></label>'+
-        '<label class="f"><span>IP-Adresse oder Hostname</span><input type="text" data-k="host" placeholder="z. B. WiNet-S des Geräts" value="'+esc(inv.host)+'"><small>die Adresse des WiNet-S an diesem Gerät</small></label>'+
+        '<label class="f"><span>IP-Adresse oder Hostname</span><input type="text" data-k="host" placeholder="z. B. WiNet-S des Geräts" value="'+esc(inv.host)+'"><small>'+(inv.type==='micro'?'die WLAN-Adresse des Mikrowechselrichters (Modbus TCP, Port 502)':'die Adresse des WiNet-S an diesem Gerät')+'</small></label>'+
         '<label class="f"><span>Modbus-Port</span><input type="number" min="1" max="65535" data-k="port" value="'+esc(inv.port)+'"><small>Standard 502</small></label>'+
         '<label class="f"><span>Geräteadresse (Unit)</span><input type="number" min="0" max="247" data-k="unitId" value="'+esc(inv.unitId)+'"><small>Standard 1</small></label>'+
         (inv.type==='hybrid'
@@ -603,6 +647,7 @@ function testInv(inv, el, btn){
 }
 $('addHybrid').onclick=function(){ C.inverters.push(newInv('hybrid')); renderInvs(); changed(); };
 $('addString').onclick=function(){ C.inverters.push(newInv('string')); renderInvs(); changed(); };
+$('addMicro').onclick=function(){ C.inverters.push(newInv('micro')); renderInvs(); changed(); };
 $('testWinet').onclick=function(){
   var b=this; b.disabled=true; $('rWinet').textContent='melde mich an und lese die Zellwerte …';
   var hy=C.inverters.filter(function(i){return i.type==='hybrid'&&i.enabled;})[0];

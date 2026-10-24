@@ -74,8 +74,8 @@ const MAX_MODULES = 8;   // der Zellblock des SBR enthält Plätze für 8 Module
 function publicConfig() {
   const c = ctx.cfg, f = readFileConfig();
   const invs = R.normalizeInverters(f).map(function (i) {
-    return { name: i.name || '', enabled: i.enabled !== false, type: i.type === 'string' ? 'string' : 'hybrid', model: R.modelOf(i).id, host: i.host || '', port: i.port || 502, unitId: i.unitId || 1,
-      ratedPower: i.ratedPower || 10600, addToHouseLoad: i.type === 'string' ? i.addToHouseLoad !== false : undefined, registers: i.registers || {} };
+    return { name: i.name || '', enabled: i.enabled !== false, type: i.type === 'string' || i.type === 'micro' ? i.type : 'hybrid', model: R.modelOf(i).id, host: i.host || '', port: i.port || 502, unitId: i.unitId || 1,
+      ratedPower: i.ratedPower || 10600, addToHouseLoad: i.type !== 'hybrid' ? i.addToHouseLoad !== false : undefined, registers: i.registers || {} };
   });
   return {
     plantName: c.plantName, httpPort: c.http.port, pollSeconds: c.pollSeconds,
@@ -87,6 +87,7 @@ function publicConfig() {
     moduleCount: c.moduleCount, topModuleIndex: c.topModuleIndex, moduleNotes: c.moduleNotes || {},
     targetModule: (c.matching && c.matching.targetModule) || c.moduleCount,
     meters: (Array.isArray(c.meters) ? c.meters : []).map(function (m) { return Object.assign({}, m, { password: undefined, passwordSet: !!m.password }); }),
+    flow: Object.assign({ house: 'auto', heatpump: 'auto', car: 'auto' }, c.flow || {}),
     heatpump: heatpumpPublic(c.heatpump || {}),
     prices: Object.assign({ exchange: 'none', fixedCt: 18, vatPercent: 19, feedInCt: 8, fallbackCt: 30, zone: 'DE-LU', url: '' }, c.prices || {}),
     forecast: { provider: (c.forecast && c.forecast.provider) || 'openmeteo', lat: c.forecast && c.forecast.lat !== null ? c.forecast.lat : '', lon: c.forecast && c.forecast.lon !== null ? c.forecast.lon : '',
@@ -171,11 +172,22 @@ function validate(body) {
   const target = int(b.targetModule, 1, MAX_MODULES); if (target === null || (moduleCount && target > moduleCount)) err.push('Nachgerüstetes Modul: 1 bis Anzahl der Module');
   const notes = {};
   Object.keys(b.moduleNotes || {}).forEach(function (k) { const n = int(k, 1, MAX_MODULES), t = String(b.moduleNotes[k] || '').trim().slice(0, 40); if (n && t && (!moduleCount || n <= moduleCount)) notes[n] = t; });
-  const mtv = validateMeters(b.meters || [], err), hpv = validateHeatpump(b.heatpump || {}, err), prv = validatePrices(b.prices || {}, err), fcv = validateForecast(b.forecast || {}, err), plv = validatePlanner(b.planner || {}, err);
+  const mtv = validateMeters(b.meters || [], err), flv = validateFlow(b.flow || {}, mtv, err), hpv = validateHeatpump(b.heatpump || {}, err), prv = validatePrices(b.prices || {}, err), fcv = validateForecast(b.forecast || {}, err), plv = validatePlanner(b.planner || {}, err);
   if (plv.heat.enabled && !hpv.enabled) err.push('Planer: die Wärmepumpe soll geplant werden, ist aber nicht aktiv.');
   if (plv.mode === 'active' && plv.heat.enabled && !hpv.writeEnabled) err.push('Planer: im aktiven Modus mit Wärmepumpe muss bei der Wärmepumpe „Schreiben erlauben“ gesetzt sein.');
   return { errors: err, value: { plantName: plantName, httpPort: httpPort, pollSeconds: pollSeconds, inverters: invs, cellSource: src, winet: winet, modbusBattery: modbusBattery,
-    moduleCount: moduleCount, topModuleIndex: top, targetModule: target, moduleNotes: notes, meters: mtv, heatpump: hpv, prices: prv, forecast: fcv, planner: plv } };
+    moduleCount: moduleCount, topModuleIndex: top, targetModule: target, moduleNotes: notes, meters: mtv, flow: flv, heatpump: hpv, prices: prv, forecast: fcv, planner: plv } };
+}
+/* Quellen des Energieflusses: auto | inverter (nur Haus) | none | register (nur Wärmepumpe) | meter:<Name eines Messgeräts> */
+function validateFlow(f, meters, err) {
+  const names = meters.map(function (m) { return m.name; });
+  const one = function (key, allowed, label) {
+    const v = String(f[key] || 'auto');
+    if (allowed.indexOf(v) >= 0) return v;
+    if (v.indexOf('meter:') === 0) { if (names.indexOf(v.slice(6)) >= 0) return v; err.push('Energiefluss ' + label + ': Messgerät „' + v.slice(6) + '“ gibt es nicht'); return 'auto'; }
+    err.push('Energiefluss ' + label + ': ungültige Quelle'); return 'auto';
+  };
+  return { house: one('house', ['auto', 'inverter'], 'Haus'), heatpump: one('heatpump', ['auto', 'none', 'register'], 'Wärmepumpe'), car: one('car', ['auto', 'none'], 'E-Auto') };
 }
 function validateMeters(list, err) {
   const out = [], names = {};
@@ -313,7 +325,7 @@ function save(v) {
   // Passwörter der Messgeräte: leeres Feld behält das gespeicherte
   const oldM = Array.isArray(c.meters) ? c.meters : [];
   v.meters.forEach(function (m) { if (m.password === '' ) { const o = oldM.filter(function (x) { return x.name === m.name; })[0]; if (o && o.password) m.password = o.password; } });
-  c.meters = v.meters; c.heatpump = v.heatpump; c.prices = v.prices; c.forecast = v.forecast; c.planner = v.planner;
+  c.meters = v.meters; c.flow = v.flow; c.heatpump = v.heatpump; c.prices = v.prices; c.forecast = v.forecast; c.planner = v.planner;
   writeFileConfig(c);
 }
 /* Betriebsart des Planers von der Seite Planer aus umschalten, ohne Neustart */

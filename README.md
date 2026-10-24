@@ -16,7 +16,8 @@
 - **Monitor** – Leistungsfluss (Solar, Batterie, Netz, Haus), Zellspannungen aller Module des Batterieturms,
   Spreizung, Verlauf, Tagesenergien und ein Balancing-Protokoll.
 - **Mehrere Wechselrichter** – genau ein Hybridwechselrichter mit Batterie, dazu beliebig viele
-  Stringwechselrichter (SG-RT). Namen frei wählbar, jeder lässt sich einzeln ein- und ausschalten.
+  Stringwechselrichter (SG-RT) und Mikrowechselrichter der S-Serie (S1600S). Namen frei wählbar, jeder lässt sich
+  einzeln ein- und ausschalten.
 - **Frei wählbare Register** – alle Modbus-Adressen sind mit den Sungrow-Standardwerten vorbelegt und
   lassen sich je Gerät ändern, mit Sofort-Test direkt auf der Seite.
 - **Einstellungen** – Betriebsart, Lade- und Entladegrenzen, Leistungsgrenzen, Zeitfenster für

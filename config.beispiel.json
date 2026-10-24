@@ -142,5 +142,10 @@
       "invert": false,
       "pollSeconds": 10
     }
-  ]
+  ],
+  "flow": {
+    "house": "auto",
+    "heatpump": "auto",
+    "car": "auto"
+  }
 }

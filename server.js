@@ -49,6 +49,7 @@ const DEFAULTS = {
   topModuleIndex: 8,
   moduleNotes: {},
   meters: [],
+  flow: { house: 'auto', heatpump: 'auto', car: 'auto' },   // Quellen des Energieflusses: auto | inverter | none | register | meter:<Name>
   heatpump: { enabled: false, name: 'Wärmepumpe', model: 'weishaupt', host: '', port: 502, unitId: 1, framing: 'rtu', pollSeconds: 30, writeEnabled: false, shift: { min: -3, max: 5 }, registers: {} },
   prices: { exchange: 'none', fixedCt: 18, vatPercent: 19, feedInCt: 8, fallbackCt: 30, zone: 'DE-LU', url: '' },
   forecast: { provider: 'openmeteo', lat: null, lon: null, planes: [], performanceRatio: 0.85, urlWeather: '', urlSolar: '' },
@@ -76,7 +77,7 @@ cfg.inverter = R.mainInverter(cfg) || { name: 'Hybrid', type: 'hybrid', enabled:
 cfg.inverter.port = cfg.inverter.port || 502;
 cfg.inverter.unitId = cfg.inverter.unitId === undefined ? 1 : cfg.inverter.unitId;
 cfg.inverter.ratedPower = cfg.inverter.ratedPower || 10600;
-cfg.strings = cfg.inverters.filter(function (i) { return i.type === 'string' && i.enabled !== false && i.host; });
+cfg.strings = cfg.inverters.filter(function (i) { return (i.type === 'string' || i.type === 'micro') && i.enabled !== false && i.host; });   // Mikrowechselrichter zählen wie Strings
 const CONFIGURED = !!cfg.inverter.host;
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -170,9 +171,15 @@ function decodeInverter(v) {
   };
 }
 
-function decodeStringInverter(v) {
+function decodeStringInverter(v, micro) {
   const g = function (k) { return v[k] === undefined || v[k] === null ? 0 : v[k]; };
   const f = g('gridFrequency');
+  if (micro) return {                      // S-Serie: 4 PV-Eingänge, einphasig, Gesamtzähler in 0,1 kWh, kein Tagesertrag-Register
+    acPower: g('acPower'), dcPower: g('dcPower'), running: g('runningState'),
+    mppt: [1, 2, 3, 4].map(function (n) { return { v: r(g('mppt' + n + 'Voltage') * 0.1, 1), a: r(g('mppt' + n + 'Current') * 0.1, 1), w: g('mppt' + n + 'Power') }; }),
+    inverterTemp: r(g('inverterTemp') * 0.1, 1), phaseVoltage: [r(g('gridVoltage1') * 0.1, 1), 0, 0], phaseCurrent: [r(g('phaseCurrent1') * 0.1, 1), 0, 0],
+    frequency: r(f / 100, 2), ratedPower: r(g('ratedPower') * 10, 0), todayKwh: null, totalKwh: r(g('yieldTotal') * 0.1, 1)
+  };
   return {
     acPower: g('acPower'),
     dcPower: g('dcPower'),
@@ -616,6 +623,21 @@ const strings = cfg.strings.map(function (sc) {
 
 function gap() { return new Promise(function (res) { setTimeout(res, cfg.requestGapMs); }); }
 
+/* Tagesertrag für Geräte ohne eigenes Tagesregister: Gesamtzähler minus Stand um Mitternacht, in data/tagesstand.json gemerkt */
+const DAY_FILE = path.join(DATA_DIR, 'tagesstand.json');
+let dayBase = { day: '', values: {} };
+try { dayBase = JSON.parse(fs.readFileSync(DAY_FILE, 'utf8')); } catch (e) { /* noch keiner */ }
+function dayYield(st, total) {
+  const d = new Date(), day = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  if (typeof total !== 'number' || !(total >= 0)) return 0;
+  if (dayBase.day !== day) { dayBase = { day: day, values: {} }; }
+  if (dayBase.values[st.cfg.name] === undefined || total < dayBase.values[st.cfg.name]) {
+    dayBase.values[st.cfg.name] = total;
+    try { fs.writeFileSync(DAY_FILE, JSON.stringify(dayBase)); } catch (e) { /* nicht kritisch */ }
+  }
+  return r(total - dayBase.values[st.cfg.name], 1);
+}
+
 function coreProblem(res, core) {
   if (res.aborted) return res.aborted;
   const miss = core.filter(function (e) { return res.values[e.key] === undefined; });
@@ -628,7 +650,8 @@ function pollStrings() {
     p = p.then(function () { return R.readPlan(st.client, st.unitId, st.plan, gap); }).then(function (res) {
       const why = coreProblem(res, st.core);
       if (why) throw new Error(why);
-      st.last = decodeStringInverter(res.values); st.at = Date.now();
+      st.last = decodeStringInverter(res.values, st.cfg.type === 'micro'); st.at = Date.now();
+      if (st.last.todayKwh === null) st.last.todayKwh = dayYield(st, st.last.totalKwh);
       if (st.error) console.log(new Date().toLocaleTimeString('de-DE') + ' ' + st.cfg.name + ' wird wieder gelesen');
       st.error = null;
     }).catch(function (e) {
@@ -733,7 +756,7 @@ function testInverter(inv) {
       if (!(val('soc') >= 0 && val('soc') <= 100)) notes.push('Der Ladezustand liegt nicht zwischen 0 und 100 %: Adresse prüfen.');
       if (!(val('battVoltage') > 40 && val('battVoltage') < 1000)) notes.push('Die Batteriespannung ist unplausibel: Adresse prüfen oder ist das ein Stringwechselrichter?');
     }
-    if (inv.type === 'string' && !why && !(val('acPower') >= 0 && val('acPower') < 200000)) notes.push('Die AC-Leistung ist unplausibel: Adresse prüfen.');
+    if ((inv.type === 'string' || inv.type === 'micro') && !why && !(val('acPower') >= 0 && val('acPower') < 200000)) notes.push('Die AC-Leistung ist unplausibel: Adresse prüfen.');
     return { ok: !why, error: why, rows: rows, notes: notes };
   }, function (e) { if (!running) client.close(); throw e; });
 }
@@ -845,6 +868,8 @@ const server = http.createServer(function (req, res) {
       now: Date.now(), lastTry: state.lastTry, lastOk: state.lastOk, error: state.error, batteryError: state.batteryError, inverter2Error: state.inverter2Error,
       live: state.live,
       meters: meters ? meters.state() : [],
+      flow: cfg.flow,
+      heatpump: heatpump ? (function (h) { return { name: h.name, live: h.live, at: h.at, error: h.error, shift: h.shift }; })(heatpump.state()) : null,
       meta: {
         plantName: cfg.plantName, inverterName: cfg.inverter.name || 'Hybrid', winetPausedUntil: winetPauseUntil,
         strings: strings.map(function (st) { return { name: st.cfg.name, host: st.cfg.host + ':' + st.port, addToHouseLoad: st.cfg.addToHouseLoad !== false }; }),
