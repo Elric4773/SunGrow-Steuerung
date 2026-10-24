@@ -23,6 +23,13 @@
   Zwangsladung und Einspeisebegrenzung lesen und schreiben, mit Zurücklesen und Protokoll.
 - **Matching-Assistent** – führt Schritt für Schritt durch das Angleichen eines neuen Batteriemoduls
   an die Bestandsmodule (Bottom-Matching über den Spannungsknick der LFP-Kennlinie).
+- **Planer** – holt den Börsenstrompreis (für dynamische Tarife wie Rabot Energy, Tibber, aWATTar), Wetter und
+  PV-Prognose und rechnet daraus den günstigsten Fahrplan: wann die Batterie aus dem Netz lädt, wann sie geschont
+  wird, wann die Wärmepumpe Wärme einlagert. Erst Simulation, dann auf Wunsch aktiv.
+- **Wärmepumpe** – Anbindung über Modbus (RTU über TCP oder Modbus TCP), vorbelegt für Weishaupt WWP S mit
+  Carel pCO5+. Geschrieben wird ausschließlich die Sollwert-Verschiebung PV (RAM), nie ein EEPROM-Register.
+- **Messgeräte** – Eastron SDM630 und andere Zähler per Modbus, über einen Loxone Miniserver oder jede
+  JSON-Schnittstelle; mit Rollen für Haus, Wärmepumpe und E-Auto im Energiefluss.
 - **Seite Anlage** – die komplette Einrichtung im Browser, geschützt durch ein eigenes Passwort.
   Eine `config.json` muss niemand von Hand schreiben.
 
@@ -36,11 +43,21 @@ Dann im Browser `http://<Rechner>:8787/anlage` öffnen, ein Passwort festlegen, 
 „Verbindung testen“, speichern. Ausführlich: **[INSTALL.md](INSTALL.md)** und **[HANDBUCH.md](HANDBUCH.md)**
 (auch als PDF).
 
+## Docker
+
+```sh
+docker run -d --name sungrow-steuerung --restart unless-stopped -p 8787:8787 -v $PWD/daten:/data ghcr.io/DEIN-GITHUB-NAME/sungrow-steuerung:latest
+```
+
+Konfiguration und Daten liegen im Volume `/data`. Eine `docker-compose.yml` liegt bei. Das Image wird bei jedem Push
+automatisch gebaut (`.github/workflows/docker.yml`) und in der GitHub Container Registry abgelegt.
+
 ## Voraussetzungen
 
 - Node.js 18 oder neuer (getestet mit 22), keine weiteren Pakete
 - Sungrow-Hybridwechselrichter der SH-RT-Reihe mit WiNet-S, Modbus TCP im lokalen Netz erreichbar
 - für die Zellspannungen: Zugang zur Weboberfläche des WiNet-S (Benutzer und Passwort)
+- für den Planer: Internetzugang des Rechners (Börsenpreise, Wetter), optional ein RS485-Ethernet-Umsetzer für die Wärmepumpe
 
 ## Unterstützen – für Maja ❤️
 

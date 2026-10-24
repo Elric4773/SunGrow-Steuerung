@@ -1,0 +1,56 @@
+/* Sungrow Steuerung – (C) by Elric M. – nur private Nutzung zu Test- und Lernzwecken, siehe LICENSE
+   Gemeinsamer Look aller Seiten: Skins, Menü, schwebende Karten. Wird nach den Seitenstilen geladen. */
+
+/* ---------- Harmonisierte Palette (geprüft auf Farbenfehlsichtigkeit und Kontrast) ----------
+   Blau = Netz/Laden, Teal = Batterie, Amber = Solar, Violett = Wärme, Preis = neutrale Stufen p1 (günstig) bis p5 (teuer) */
+:root{--grid:#3B6FD9;--batt:#1E9A82;--pv:#B9861A;--heat:#7F5FCC;--lo:#3B6FD9;--pvfill:rgba(185,134,26,.2);--p1:#DCE2E8;--p2:#C3CCD5;--p3:#A7B3BF;--p4:#8794A3;--p5:#67768A;--bar:#A7B3BF}
+@media (prefers-color-scheme:dark){:root{--grid:#5E8EE0;--batt:#2FA893;--pv:#BD871A;--heat:#A47BD6;--lo:#5E8EE0;--pvfill:rgba(189,135,26,.2);--p1:#2A3440;--p2:#34404D;--p3:#3F4C5B;--p4:#4B5A6B;--p5:#5A6A7D;--bar:#3F4C5B}}
+
+/* ---------- Skins: Farbwelten. "auto" folgt dem System, die anderen erzwingen ihre Farben ---------- */
+:root[data-theme="hell"]{--bg:#E7EAED;--panel:#F8F9FA;--ink:#17202A;--muted:#5A6673;--line:#C9D0D7;--track:#DDE2E7;--pv:#B9861A;--grid:#3B6FD9;--batt:#1E9A82;--alert:#C2352B;--heat:#7F5FCC;--bar:#A7B3BF;--pvfill:rgba(185,134,26,.2);--night:rgba(23,32,42,.05);--edit:#FFF3D6;--lo:#3B6FD9;--p1:#DCE2E8;--p2:#C3CCD5;--p3:#A7B3BF;--p4:#8794A3;--p5:#67768A;color-scheme:light}
+:root[data-theme="dunkel"]{--bg:#141A21;--panel:#1C242D;--ink:#E6EAEE;--muted:#97A3AF;--line:#34404C;--track:#2A343F;--pv:#BD871A;--grid:#5E8EE0;--batt:#2FA893;--alert:#EF6A5F;--heat:#A47BD6;--bar:#3F4C5B;--pvfill:rgba(189,135,26,.2);--night:rgba(0,0,0,.22);--edit:#3A3016;--lo:#5E8EE0;--p1:#2A3440;--p2:#34404D;--p3:#3F4C5B;--p4:#4B5A6B;--p5:#5A6A7D;color-scheme:dark}
+/* Nacht: tiefes Blau mit Neonakzenten, für die Wand im Technikraum */
+:root[data-theme="nacht"]{--bg:#070B14;--panel:#0F1626;--ink:#E9F1FF;--muted:#8A9BB8;--line:#1F2B44;--track:#182238;--pv:#E0A52E;--grid:#6AA6F2;--batt:#35C9AC;--alert:#FF6B6B;--heat:#B48CE8;--bar:#2B3A57;--pvfill:rgba(224,165,46,.22);--night:rgba(0,0,0,.3);--edit:#3A2E10;--lo:#6AA6F2;--p1:#1A2640;--p2:#22314F;--p3:#2B3A57;--p4:#384A6C;--p5:#4A5E82;color-scheme:dark}
+/* Sand: warmes Papier, ruhig fürs Büro */
+:root[data-theme="sand"]{--bg:#EFE9DD;--panel:#FBF8F1;--ink:#2B2620;--muted:#6F6659;--line:#D9D0C0;--track:#E7DFCE;--pv:#B07A12;--grid:#3763B8;--batt:#1E8F79;--alert:#B9402F;--heat:#7A58BE;--bar:#C9BFAD;--pvfill:rgba(176,122,18,.2);--night:rgba(43,38,32,.06);--edit:#FFF0CC;--lo:#3763B8;--p1:#E6DECF;--p2:#D5CBB8;--p3:#C0B49F;--p4:#A4977F;--p5:#857862;color-scheme:light}
+/* Dunkle Skins: Schatten kräftiger, Hintergrundlicht dezenter */
+:root[data-theme="dunkel"],:root[data-theme="nacht"]{--shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -8px rgba(0,0,0,.6),0 30px 60px -30px rgba(0,0,0,.7);--shadow-hi:0 2px 4px rgba(0,0,0,.5),0 20px 44px -10px rgba(0,0,0,.7),0 50px 90px -36px rgba(0,0,0,.7)}
+:root[data-theme="hell"],:root[data-theme="sand"]{--shadow:0 1px 2px rgba(23,32,42,.06),0 10px 28px -8px rgba(23,32,42,.22),0 30px 60px -30px rgba(23,32,42,.25);--shadow-hi:0 2px 4px rgba(23,32,42,.08),0 18px 40px -10px rgba(23,32,42,.3),0 44px 80px -36px rgba(23,32,42,.3)}
+:root[data-theme="nacht"] body{background:radial-gradient(1000px 520px at 15% -10%,rgba(95,168,255,.16),transparent 60%),radial-gradient(900px 500px at 100% 0%,rgba(46,230,197,.12),transparent 55%),var(--bg);background-attachment:fixed}
+:root[data-theme="sand"] body{background:radial-gradient(1000px 520px at 15% -10%,rgba(184,120,10,.14),transparent 60%),radial-gradient(900px 500px at 100% 0%,rgba(30,127,107,.10),transparent 55%),var(--bg);background-attachment:fixed}
+
+/* ---------- Menü: schwebende Leiste mit Pillen ---------- */
+.top,header nav[role="tablist"]{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:0 0 18px;padding:6px;border:1px solid var(--line);border-radius:999px;background:color-mix(in srgb,var(--panel) 85%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:var(--shadow)}
+.top a,header nav[role="tablist"] a.navlink,header nav[role="tablist"] button{font:inherit;font-size:17px;font-weight:500;padding:8px 18px;border:0;border-radius:999px;margin:0;background:transparent;color:var(--muted);text-decoration:none;cursor:pointer;transition:background .2s ease,color .2s ease,transform .2s ease;display:inline-flex;align-items:center;gap:8px}
+.top a:hover,.top a:focus-visible,header nav[role="tablist"] a.navlink:hover,header nav[role="tablist"] a.navlink:focus-visible,header nav[role="tablist"] button:hover{background:var(--track);color:var(--ink)}
+.top a[aria-current="page"],header nav[role="tablist"] button[aria-selected="true"]{background:var(--ink);color:var(--panel);box-shadow:0 6px 14px -6px rgba(0,0,0,.45)}
+.top a[aria-current="page"]:hover,header nav[role="tablist"] button[aria-selected="true"]:hover{background:var(--ink);color:var(--panel)}
+.top a::before,header nav[role="tablist"] a.navlink::before,header nav[role="tablist"] button::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.35}
+.top a[aria-current="page"]::before,header nav[role="tablist"] button[aria-selected="true"]::before{opacity:1;background:var(--batt)}
+.top .copy{margin-left:auto;padding:0 14px 0 16px;font-size:14px;color:var(--muted);white-space:nowrap}
+header nav[role="tablist"] button.live::after{background:var(--pv)}
+/* Seite Einstellungen/Matching: Kopfzeile ohne harte Linie */
+header{border-bottom:0!important;align-items:center!important;gap:10px 18px!important}
+header h1{font-size:22px!important;margin:0 8px 0 0!important}
+header .right{padding-bottom:0!important}
+
+/* ---------- Skin-Wahl im Menü ---------- */
+.skin{position:relative;margin-left:auto;display:flex;align-items:center;gap:6px}
+.top .skin{margin-left:auto} .top .skin+.copy{margin-left:0}
+.skin button{font:inherit;font-size:14px;padding:6px 12px 6px 8px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.skin button:hover,.skin button:focus-visible{color:var(--ink);border-color:var(--muted)}
+.skin .hd{padding:6px 10px;font-size:16px;line-height:1}
+.skin .sw{width:14px;height:14px;border-radius:50%;background:linear-gradient(135deg,var(--pv) 0 50%,var(--batt) 50% 100%);box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+.skin menu{position:absolute;right:0;top:calc(100% + 8px);margin:0;padding:6px;list-style:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-hi);z-index:20;min-width:170px}
+.skin menu[hidden]{display:none}
+.skin menu button{width:100%;border:0;background:transparent;border-radius:8px;justify-content:flex-start;padding:8px 10px;font-size:15px;color:var(--ink)}
+.skin menu button[aria-checked="true"]{background:var(--track)}
+.skin menu .sw{box-shadow:inset 0 0 0 1px rgba(0,0,0,.2)}
+.skin menu .sw.auto{background:conic-gradient(#E7EAED 0 50%,#141A21 50% 100%)} .skin menu .sw.hell{background:#E7EAED} .skin menu .sw.dunkel{background:#141A21} .skin menu .sw.nacht{background:linear-gradient(135deg,#070B14 0 50%,#2EE6C5 50% 100%)} .skin menu .sw.sand{background:#EFE9DD}
+
+/* ---------- Karten, Knöpfe ---------- */
+.panel{border-radius:14px;box-shadow:var(--shadow);transition:transform .25s ease,box-shadow .25s ease}
+@media (prefers-reduced-motion:no-preference){.panel:hover{transform:translateY(-2px);box-shadow:var(--shadow-hi)}}
+button.b,.seg{border-radius:999px;box-shadow:var(--shadow)} .seg{overflow:hidden}
+.banner{border-radius:10px;box-shadow:var(--shadow)}
+@media (max-width:640px){.top,header nav[role="tablist"]{border-radius:18px}.top a,header nav[role="tablist"] a.navlink,header nav[role="tablist"] button{padding:7px 12px;font-size:15px}.top .copy{display:none}}

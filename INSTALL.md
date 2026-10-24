@@ -15,6 +15,8 @@ Linux-Server oder Windows-PC.
 | Feste IP-Adresse des WiNet-S | Im Router eine feste Zuordnung (DHCP-Reservierung) einrichten. |
 | Zugangsdaten der WiNet-S-Weboberfläche | Nur für die Zellspannungen nötig. |
 | optional: Stringwechselrichter SG-RT | ebenfalls per Modbus TCP, eigene IP-Adresse. |
+| optional: Wärmepumpe | RS485-Ethernet-Umsetzer am BMS-Anschluss des Reglers (Carel pCO5+: Klemme J25 BMS2, Tx/Rx+ und Tx/Rx−, GND), Umsetzer im transparenten Betrieb mit den seriellen Einstellungen des Reglers. |
+| optional: Planer | Internetzugang des Rechners für Börsenpreise und Wetter. |
 
 > **Hinweis zum WiNet-S:** Er erlaubt nur eine Anmeldung an der Weboberfläche gleichzeitig. Solange die
 > Steuerung Zellwerte liest, wirft sie andere Sitzungen (Browser, App des Installateurs) hinaus. Für eigene
@@ -53,7 +55,9 @@ http://<IP-des-Rechners>:8787/anlage
 4. **Zellwerte**: Quelle „WiNet-S“ wählen, Benutzer und Passwort der WiNet-Weboberfläche eintragen,
    **„WiNet-S testen“**.
 5. **Batterieturm**: Anzahl der Module und Nummer des obersten Moduls.
-6. **„Speichern und neu starten“**. Die Steuerung schreibt `config.json` und startet sich selbst neu.
+6. Optional **Wärmepumpe**, **Strompreis**, **Prognose** und **Planer** ausfüllen; jeder Abschnitt hat einen Test-Knopf.
+   Der Planer startet am besten in der Betriebsart *Simulation*.
+7. **„Speichern und neu starten“**. Die Steuerung schreibt `config.json` und startet sich selbst neu.
    Danach öffnet `http://<IP>:8787/` den Monitor.
 
 Ab hier kann das Konsolenfenster geschlossen werden, wenn die Steuerung wie unten beschrieben im
@@ -81,6 +85,27 @@ Entfernen: `sudo sh install-dienst.sh entfernen`. Von Hand: `sh start.sh` starte
 `sh stop.sh` beendet. Das Protokoll steht in `data/steuerung.log`.
 
 > Nach einem DSM-Update kann `/etc/crontab` zurückgesetzt sein. Dann `install-dienst.sh` erneut ausführen.
+
+### Docker (NAS, Server, überall)
+
+Fertiges Image aus der GitHub Container Registry oder selbst gebaut. Konfiguration und Daten liegen im Volume `/data`.
+
+```sh
+docker run -d --name sungrow-steuerung --restart unless-stopped \
+  -p 8787:8787 -v $PWD/daten:/data -e TZ=Europe/Berlin \
+  ghcr.io/DEIN-GITHUB-NAME/sungrow-steuerung:latest
+```
+
+Oder mit der mitgelieferten `docker-compose.yml`: `docker compose up -d`. Selbst bauen: `docker build -t sungrow-steuerung .`
+
+Hinweise:
+- Nach dem Speichern auf der Seite Anlage beendet sich das Programm (`SUNGROW_SUPERVISED=1` ist im Image gesetzt),
+  Docker startet es mit `restart: unless-stopped` neu.
+- Der Container läuft ohne root. Das Verzeichnis für `/data` muss für den Container beschreibbar sein
+  (`chown 100:101 daten` bei Alpine-Images, oder einfach leer anlegen, Docker setzt die Rechte beim ersten Start).
+- Ohne Docker lässt sich der Datenordner genauso trennen: Umgebungsvariable `SUNGROW_CONFIG_DIR=/pfad` setzen,
+  dann liegen `config.json` und `data/` dort statt im Programmordner.
+- Port ändern: `-p 9000:8787` genügt, der innere Port bleibt 8787. `PORT` als Umgebungsvariable gilt nur, solange in `config.json` kein Port gespeichert ist; danach zählt die Seite Anlage.
 
 ### Linux mit systemd (Raspberry Pi, Debian, Ubuntu)
 

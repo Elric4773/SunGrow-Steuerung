@@ -20,6 +20,7 @@ module.exports = function (ctx) {
 const cfg = ctx.cfg, state = ctx.state, invClient = ctx.invClient, DATA_DIR = ctx.dataDir;
 const P = Object.assign({}, DEFAULTS, cfg.matching || {}, { inverter: cfg.inverter });
 const STATE_FILE = path.join(DATA_DIR, 'ablauf.json');
+const CHANGE_LOG = path.join(DATA_DIR, 'aenderungen.jsonl');
 const RATED = cfg.inverter.ratedPower || 10600;
 /* Registeradresse zu einem Schlüssel: aus der Konfiguration (Seite Anlage), sonst Sungrow-Standard */
 const STD = { emsMode: 13049, forcedCmd: 13050, forcedPower: 13051, minSoc: 13058, backupReserve: 13099, tcEnable: 33207 };
@@ -55,15 +56,24 @@ function emsMatches(st, want) {
   if (want.kind === 'ruhe') return st.forcedCommand === 'Stopp';
   return st.forcedCommand === (want.kind === 'laden' ? 'Laden' : 'Entladen') && st.forcedPowerW === want.watts;
 }
+function emsPairs(want) {
+  if (want.kind === 'normal') return [[A('forcedCmd'), 0xcc], [A('forcedPower'), 0], [A('emsMode'), 0]];
+  const cmd = want.kind === 'laden' ? 0xaa : want.kind === 'entladen' ? 0xbb : 0xcc;
+  // erst Leistung und Befehl, dann die Betriebsart: so läuft er nie mit einem alten Leistungswert los
+  return [[A('forcedPower'), want.kind === 'ruhe' ? 0 : Math.max(0, Math.min(RATED, want.watts || 0))], [A('forcedCmd'), cmd], [A('emsMode'), 2]];
+}
+/* Für den Planer: Zwangsmodus setzen, ohne den Matching-Ablauf zu berühren. Während eines Ablaufs abgelehnt. */
+function logChange(who, what) {
+  const entry = { t: Date.now(), id: 'emsMode', label: 'Betriebsart (' + who + ')', addr: A('emsMode'), from: '', to: what, ok: true };
+  fs.appendFile(CHANGE_LOG, JSON.stringify(entry) + '\n', function () {});
+}
+function applyEmsExternal(want) {
+  if (M.active) return Promise.reject(new Error('Matching-Ablauf läuft, der Wechselrichter gehört gerade dem Ablauf'));
+  return modbusWriteSequence(emsPairs(want)).then(function () { logChange('Planer', wantText(want)); });
+}
 function emsApply(want) {
   M.lastWrite = Date.now();
-  let pairs;
-  if (want.kind === 'normal') pairs = [[A('forcedCmd'), 0xcc], [A('forcedPower'), 0], [A('emsMode'), 0]];
-  else {
-    const cmd = want.kind === 'laden' ? 0xaa : want.kind === 'entladen' ? 0xbb : 0xcc;
-    // erst Leistung und Befehl, dann die Betriebsart: so läuft er nie mit einem alten Leistungswert los
-    pairs = [[A('forcedPower'), want.kind === 'ruhe' ? 0 : want.watts], [A('forcedCmd'), cmd], [A('emsMode'), 2]];
-  }
+  const pairs = emsPairs(want);
   return modbusWriteSequence(pairs).then(function () { M.writeError = null; mLog('Wechselrichter gesetzt: ' + wantText(want)); },
     function (e) { M.writeError = e.message; mLog('Schreiben fehlgeschlagen (' + e.message + '), neuer Versuch folgt'); });
 }
@@ -349,7 +359,6 @@ const READ_BLOCKS = (function () {
   a.forEach(function (x) { const last = out[out.length - 1]; if (last && x - (last[0] + last[1]) <= 2 && x - last[0] < 30) last[1] = x - last[0] + 1; else out.push([x, 1]); });
   return out;
 })();
-const CHANGE_LOG = path.join(DATA_DIR, 'aenderungen.jsonl');
 let settingsCache = { at: 0, values: {}, raw: {}, errors: [], reading: null };
 
 function readSettings(force) {
@@ -466,5 +475,5 @@ function handle(req, res, url) {
 if (M.active) console.log('Gespeicherter Matching-Ablauf wird fortgesetzt im Schritt ' + M.state);
 setInterval(tick, Math.max(1, P.tickSeconds) * 1000);
 process.on('SIGTERM', function () { try { fs.writeFileSync(STATE_FILE, JSON.stringify(M)); } catch (e) { /* egal */ } });
-return { tick: tick, handle: handle, isActive: function () { return M.active; } };
+return { tick: tick, handle: handle, isActive: function () { return M.active; }, applyEms: applyEmsExternal };
 };

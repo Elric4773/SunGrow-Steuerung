@@ -23,9 +23,11 @@ const path = require('path');
 const R = require('./registers');
 
 const ROOT = __dirname;
-const DATA_DIR = path.join(ROOT, 'data');
+/* Datenordner: config.json und data/ liegen im Programmordner, oder in SUNGROW_CONFIG_DIR (z. B. ein Docker-Volume) */
+const CONF_DIR = process.env.SUNGROW_CONFIG_DIR ? path.resolve(process.env.SUNGROW_CONFIG_DIR) : ROOT;
+const DATA_DIR = path.join(CONF_DIR, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
-const CONFIG_FILE = path.join(ROOT, 'config.json');
+const CONFIG_FILE = path.join(CONF_DIR, 'config.json');
 const BUILD = 'd807f67b035c6060d7409de0a3ac2742b9cff20cce35cc3b669cb762621207ad';   // Kennung dieses Standes, Kopfzeile X-Build
 
 /* ---------------------------------------------------------------- Konfiguration
@@ -33,7 +35,7 @@ const BUILD = 'd807f67b035c6060d7409de0a3ac2742b9cff20cce35cc3b669cb762621207ad'
 
 const DEFAULTS = {
   plantName: 'Meine Anlage',
-  http: { port: 8787 },
+  http: { port: parseInt(process.env.PORT, 10) || 8787 },
   inverters: [],
   battery: { enabled: false, host: null, port: 502, unitId: 200, cellBlockAddress: 10756, cellBlockCount: 32 },
   winet: { enabled: true, host: null, port: 443, username: '', password: '', paramAddress: 10756, paramCount: 30, paramType: 0, intervalSeconds: 30 },
@@ -45,7 +47,13 @@ const DEFAULTS = {
   retentionDays: 120,
   moduleCount: 8,
   topModuleIndex: 8,
-  moduleNotes: {}
+  moduleNotes: {},
+  meters: [],
+  heatpump: { enabled: false, name: 'Wärmepumpe', model: 'weishaupt', host: '', port: 502, unitId: 1, framing: 'rtu', pollSeconds: 30, writeEnabled: false, shift: { min: -3, max: 5 }, registers: {} },
+  prices: { exchange: 'none', fixedCt: 18, vatPercent: 19, feedInCt: 8, fallbackCt: 30, zone: 'DE-LU', url: '' },
+  forecast: { provider: 'openmeteo', lat: null, lon: null, planes: [], performanceRatio: 0.85, urlWeather: '', urlSolar: '' },
+  planner: { mode: 'off', horizonHours: 36, capacityKwh: 0, minSoc: 10, maxSoc: 100, chargeW: 5000, dischargeW: 5000, pvChargeW: 10000, efficiency: 0.88, marginCt: 2, baseLoadW: 400, tickSeconds: 60,
+    heat: { enabled: false, limitTemp: 15, wattsPerKelvin: 100, kwPerShiftK: 0.15, storeHours: 4, shiftUp: 3, shiftDown: -2, surplusW: 1500, cheapPct: 25, expensivePct: 25 } }
 };
 
 function merge(base, over) {
@@ -74,145 +82,7 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 /* ---------------------------------------------------------------- Modbus TCP */
 
-const MODBUS_EXCEPTIONS = {
-  1: 'Funktion nicht unterstützt',
-  2: 'Registeradresse unbekannt',
-  3: 'ungültiger Wert',
-  4: 'Gerätefehler',
-  6: 'Gerät beschäftigt',
-  10: 'Gateway: Pfad nicht verfügbar',
-  11: 'Gateway: Zielgerät antwortet nicht'
-};
-
-function ModbusTcp(host, port, timeoutMs) {
-  this.host = host;
-  this.port = port;
-  this.timeoutMs = timeoutMs;
-  this.sock = null;
-  this.buf = Buffer.alloc(0);
-  this.tid = 0;
-  this.pending = null;
-  this.chain = Promise.resolve();
-}
-
-ModbusTcp.prototype.connect = function () {
-  const self = this;
-  return new Promise(function (resolve, reject) {
-    const s = net.createConnection({ host: self.host, port: self.port });
-    let settled = false;
-    const timer = setTimeout(function () {
-      if (settled) return;
-      settled = true;
-      s.destroy();
-      reject(new Error('keine Antwort beim Verbindungsaufbau'));
-    }, self.timeoutMs);
-    s.setNoDelay(true);
-    s.once('connect', function () {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      self.sock = s;
-      self.buf = Buffer.alloc(0);
-      resolve();
-    });
-    s.on('data', function (d) { if (self.sock === s) self._onData(d); });
-    s.on('error', function (e) {
-      if (!settled) { settled = true; clearTimeout(timer); reject(e); }
-      if (self.sock === s) { self.sock = null; self._fail(e); }
-    });
-    s.on('close', function () {
-      if (self.sock === s) { self.sock = null; self._fail(new Error('Verbindung vom Gerät geschlossen')); }
-    });
-  });
-};
-
-ModbusTcp.prototype._fail = function (err) {
-  const p = this.pending;
-  if (!p) return;
-  this.pending = null;
-  clearTimeout(p.timer);
-  p.reject(err);
-};
-
-ModbusTcp.prototype._onData = function (d) {
-  this.buf = Buffer.concat([this.buf, d]);
-  while (this.buf.length >= 7) {
-    const len = this.buf.readUInt16BE(4);
-    if (this.buf.length < 6 + len) return;
-    const frame = this.buf.slice(0, 6 + len);
-    this.buf = this.buf.slice(6 + len);
-    this._onFrame(frame);
-  }
-};
-
-ModbusTcp.prototype._onFrame = function (f) {
-  const p = this.pending;
-  if (!p || f.readUInt16BE(0) !== p.tid || f.length < 9) return;
-  this.pending = null;
-  clearTimeout(p.timer);
-  const fc = f[7];
-  if (fc & 0x80) {
-    const code = f[8];
-    p.reject(new Error('Modbus-Ausnahme ' + code + ' (' + (MODBUS_EXCEPTIONS[code] || 'unbekannt') + ')'));
-    return;
-  }
-  if (fc === 6) { p.resolve([f.length >= 12 ? f.readUInt16BE(10) : 0]); return; }   // Antwort auf "ein Register schreiben"
-  const n = f[8];
-  const out = [];
-  for (let i = 0; i + 1 < n && 9 + i + 1 < f.length; i += 2) out.push(f.readUInt16BE(9 + i));
-  p.resolve(out);
-};
-
-/* Ein einzelnes Holding-Register schreiben. Der Messbetrieb ruft das nie auf, nur der Steuerteil (control.js). */
-ModbusTcp.prototype.write = function (unit, addr, value) {
-  const self = this;
-  const run = function () { return self._read(unit, 6, addr, value); };
-  const r = this.chain.then(run, run);
-  this.chain = r.catch(function () {});
-  return r;
-};
-
-/* Anfragen laufen strikt nacheinander – der WiNet-S verträgt keine parallelen Requests. */
-ModbusTcp.prototype.read = function (unit, fc, addr, count) {
-  const self = this;
-  const run = function () { return self._read(unit, fc, addr, count); };
-  const r = this.chain.then(run, run);
-  this.chain = r.catch(function () {});
-  return r;
-};
-
-ModbusTcp.prototype._read = function (unit, fc, addr, count) {
-  const self = this;
-  const ready = this.sock ? Promise.resolve() : this.connect();
-  return ready.then(function () {
-    return new Promise(function (resolve, reject) {
-      self.tid = (self.tid + 1) & 0xffff;
-      const tid = self.tid;
-      const req = Buffer.alloc(12);
-      req.writeUInt16BE(tid, 0);
-      req.writeUInt16BE(0, 2);
-      req.writeUInt16BE(6, 4);
-      req[6] = unit;
-      req[7] = fc;
-      req.writeUInt16BE(addr, 8);
-      req.writeUInt16BE(count, 10);
-      const timer = setTimeout(function () {
-        if (self.pending && self.pending.tid === tid) {
-          self.pending = null;
-          self.close();
-          reject(new Error('Zeitüberschreitung (Unit ' + unit + ', Adresse ' + addr + ')'));
-        }
-      }, self.timeoutMs);
-      self.pending = { tid: tid, resolve: resolve, reject: reject, timer: timer };
-      self.sock.write(req);
-    });
-  });
-};
-
-ModbusTcp.prototype.close = function () {
-  if (this.sock) { const s = this.sock; this.sock = null; s.destroy(); }
-  this.buf = Buffer.alloc(0);
-};
+const ModbusTcp = require('./modbus-client');     // Modbus TCP und RTU über TCP, gemeinsam mit der Wärmepumpe
 
 /* ---------------------------------------------------------------- Dekodierung */
 
@@ -667,6 +537,17 @@ function store(live) {
   };
   if (live.inverter2) { s.pv2 = live.inverter2.acPower; s.pv2h = live.plant.loadPower - i.loadPower; }
   if (i.battery.bmsMaxCharge !== undefined) { s.bmc = i.battery.bmsMaxCharge; s.bmd = i.battery.bmsMaxDischarge; }
+  if (heatpump) {
+    const h = heatpump.state();
+    if (h.live && now - h.at < 5 * 60000) { const v = h.live.values; if (v.elPower !== undefined) s.hpw = v.elPower; else if (h.live.running !== undefined) s.hpon = h.live.running ? 1 : 0; if (v.outdoorTemp !== undefined) s.hpt = v.outdoorTemp; }
+  }
+  if (meters) {
+    const mh = meters.sumRole('heatpump'), mc = meters.sumRole('car'), mhouse = meters.sumRole('house');   // gemessene Werte haben Vorrang
+    if (mh !== null) s.hpw = mh;
+    if (mc !== null) s.carw = mc;
+    if (mhouse !== null) s.mhouse = mhouse;
+  }
+  if (forecast && live.plant) forecast.reportActual(live.plant.todayPv);
   if (c) {
     s.cmax = c.cellMax; s.cmin = c.cellMin;
     s.mmax = c.modules.map(function (m) { return m.max; });
@@ -879,6 +760,24 @@ if (CONFIGURED && (!cfg.control || cfg.control.enabled !== false)) {
   catch (e) { console.log('Steuerteil nicht geladen (' + e.message + '). Der Monitor läuft trotzdem.'); }
 }
 
+/* ---------------------------------------------------------------- Wärmepumpe, Preise, Prognose, Planer */
+
+const tlog = function (t) { console.log(new Date().toLocaleTimeString('de-DE') + ' ' + t); };
+let heatpump = null, prices = null, forecast = null, planner = null, meters = null;
+if (CONFIGURED) {
+  try {
+    if (Array.isArray(cfg.meters) && cfg.meters.length) meters = require('./meters')({ cfg: cfg.meters, timeoutMs: cfg.timeoutMs, log: tlog });
+    if (cfg.heatpump.enabled && cfg.heatpump.host) heatpump = require('./heatpump')({ cfg: cfg.heatpump, timeoutMs: cfg.timeoutMs, requestGapMs: 100, log: tlog });
+    prices = require('./prices')({ cfg: cfg.prices, dataDir: DATA_DIR, log: tlog, onUpdate: function () { if (planner) planner.invalidate(); } });
+    forecast = require('./forecast')({ cfg: cfg.forecast, dataDir: DATA_DIR, log: tlog, onUpdate: function () { if (planner) planner.invalidate(); } });
+    planner = require('./planner')({ cfg: cfg.planner, dataDir: DATA_DIR, prices: prices, forecast: forecast, heatpump: heatpump,
+      live: function () { return state.live; }, lastOk: function () { return state.lastOk; }, history: function () { return history; },
+      matchingActive: function () { return !!(control && control.isActive()); },
+      applyEms: function (want) { return control ? control.applyEms(want) : Promise.reject(new Error('Steuerteil nicht geladen')); },
+      saveMode: function (mode) { try { setup.setPlannerMode(mode); } catch (e) { tlog('Betriebsart des Planers konnte nicht gespeichert werden: ' + e.message); } } });
+  } catch (e) { console.log('Planer nicht geladen (' + e.message + ').'); planner = null; }
+}
+
 /* ---------------------------------------------------------------- HTTP */
 
 function sendJson(res, obj) {
@@ -906,18 +805,20 @@ function restart() {
   console.log(new Date().toLocaleString('de-DE') + ' Neustart mit der neuen Konfiguration');
   try { fs.writeFileSync(BAL_FILE, JSON.stringify(balancing)); } catch (e) { /* egal */ }
   server.close();
-  setTimeout(function () {
+  const settle = planner ? planner.stop().catch(function () {}) : Promise.resolve();
+  Promise.race([settle, new Promise(function (r) { setTimeout(r, 4000); })]).then(function () { setTimeout(function () {
     if (process.env.INVOCATION_ID || process.env.SUNGROW_SUPERVISED) process.exit(0);
     const out = fs.openSync(path.join(DATA_DIR, 'steuerung.log'), 'a');
     const child = require('child_process').spawn(process.execPath, [path.join(ROOT, 'server.js')], { cwd: ROOT, detached: true, stdio: ['ignore', out, out], env: process.env });
+    // Hinweis: unter systemd oder Docker (SUNGROW_SUPERVISED=1) kommt es nicht hierher, dort startet der Dienstverwalter neu
     child.unref();
     process.exit(0);
-  }, 300);
+  }, 300); });
 }
 
-const setup = require('./setup')({ root: ROOT, cfg: cfg, configured: function () { return CONFIGURED; }, restart: restart, busy: function () { return !!(control && control.isActive()); },
+const setup = require('./setup')({ root: ROOT, configFile: CONFIG_FILE, cfg: cfg, configured: function () { return CONFIGURED; }, restart: restart, busy: function () { return !!(control && control.isActive()); },
   testInverter: testInverter, testWinet: testWinet });
-const PAGES = ['/', '/index.html', '/einstellungen', '/matching', '/steuerung.html'];
+const PAGES = ['/', '/index.html', '/einstellungen', '/matching', '/steuerung.html', '/planer', '/planer.html'];
 
 const server = http.createServer(function (req, res) {
   const url = new URL(req.url, 'http://localhost');
@@ -932,11 +833,12 @@ const server = http.createServer(function (req, res) {
     return sendJson(res, {
       now: Date.now(), lastTry: state.lastTry, lastOk: state.lastOk, error: state.error, batteryError: state.batteryError, inverter2Error: state.inverter2Error,
       live: state.live,
+      meters: meters ? meters.state() : [],
       meta: {
         plantName: cfg.plantName, inverterName: cfg.inverter.name || 'Hybrid', winetPausedUntil: winetPauseUntil,
         strings: strings.map(function (st) { return { name: st.cfg.name, host: st.cfg.host + ':' + st.port, addToHouseLoad: st.cfg.addToHouseLoad !== false }; }),
         inverter2: strings.length ? { name: strings.length === 1 ? strings[0].cfg.name : 'Stringwechselrichter', host: strings.map(function (st) { return st.cfg.host + ':' + st.port; }).join(', '), addToHouseLoad: strings.some(function (st) { return st.cfg.addToHouseLoad !== false; }) } : null, moduleCount: cfg.moduleCount, topModuleIndex: cfg.topModuleIndex,
-        moduleNotes: cfg.moduleNotes, pollSeconds: cfg.pollSeconds,
+        moduleNotes: cfg.moduleNotes, pollSeconds: cfg.pollSeconds, planner: planner ? planner.view().mode : null, heatpump: heatpump ? heatpump.state().name : null,
         inverter: cfg.inverter.host + ':' + cfg.inverter.port, battery: cfg.winet.enabled ? 'WiNet-S ' + winetHost() + ', Web-Schnittstelle' : battHost + ':' + cfg.battery.port + ' / Unit ' + cfg.battery.unitId, cellSource: cfg.winet.enabled ? 'winet' : 'modbus'
       }
     });
@@ -962,9 +864,28 @@ const server = http.createServer(function (req, res) {
     });
     return;
   }
+  if (url.pathname === '/api/planer') {
+    if (!planner) return sendJson(res, { error: 'Planer nicht geladen' });
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', function (c) { body += c; if (body.length > 2000) req.destroy(); });
+      req.on('end', function () {
+        let j = {}; try { j = JSON.parse(body); } catch (e) { /* leer */ }
+        let err = null;
+        if (j.action === 'mode') err = planner.setMode(j.mode);
+        else if (j.action === 'replan') { try { planner.replan(); } catch (e) { err = e.message; } }
+        else if (j.action === 'refresh') { prices.refresh(); forecast.refresh(); if (heatpump) heatpump.readOnce(); }
+        else err = 'Unbekannte Aktion';
+        sendJson(res, { error: err, state: planner.view() });
+      });
+      return;
+    }
+    return sendJson(res, planner.view());
+  }
   if (control && control.handle(req, res, url)) return;
   if (url.pathname.indexOf('/api/') === 0) { res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify({ error: 'unbekannt' })); return; }
   if (url.pathname === '/einstellungen' || url.pathname === '/matching') return serveStatic('/steuerung.html', res);
+  if (url.pathname === '/planer') return serveStatic('/planer.html', res);
   serveStatic(url.pathname, res);
 });
 
@@ -977,6 +898,7 @@ server.on('error', function (e) {
 });
 server.listen(cfg.http.port, function () {
   try { fs.writeFileSync(path.join(DATA_DIR, 'steuerung.pid'), String(process.pid)); } catch (e) { /* egal */ }
+  if (CONF_DIR !== ROOT) console.log('Konfiguration und Daten in ' + CONF_DIR);
   if (!CONFIGURED) {
     console.log('Sungrow Steuerung läuft auf Port ' + cfg.http.port + ' im Einrichtungsmodus: im Browser http://<Rechner>:' + cfg.http.port + '/anlage öffnen.');
     return;
@@ -987,9 +909,21 @@ server.listen(cfg.http.port, function () {
   if (cfg.winet.enabled) { console.log('Zellwerte: über die Web-Schnittstelle des WiNet-S (' + winetHost() + ':' + cfg.winet.port + ')'); winetLoop(); }
   else if (cfg.battery.enabled) console.log('Batterie: ' + battHost + ':' + cfg.battery.port + ' (Unit ' + cfg.battery.unitId + ')');
   loop();
+  if (heatpump) heatpump.start();
+  if (meters) meters.start();
+  if (prices) prices.start();
+  if (forecast) forecast.start();
+  if (planner) { planner.start(); console.log('Planer: ' + ({ off: 'aus', simulate: 'Simulation', active: 'AKTIV' })[cfg.planner.mode] + (cfg.prices.exchange === 'none' ? ', ohne Börsenpreise' : ', Börse ' + cfg.prices.exchange)); }
 });
 
-process.on('SIGTERM', function () {
+let ending = false;
+function shutdown() {
+  if (ending) return; ending = true;
   try { fs.writeFileSync(BAL_FILE, JSON.stringify(balancing)); } catch (e) { /* egal */ }
-  process.exit(0);
-});
+  // Planer zurücknehmen: Wechselrichter auf Eigenverbrauch, Verschiebung der Wärmepumpe auf 0
+  if (meters) meters.stop();
+  const settle = planner ? planner.stop().catch(function () {}) : Promise.resolve();
+  Promise.race([settle, new Promise(function (r) { setTimeout(r, 4000); })]).then(function () { process.exit(0); });
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

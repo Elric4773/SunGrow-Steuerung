@@ -1,0 +1,14 @@
+# Sungrow Steuerung als Container. Start: docker compose up -d
+# Danach im Browser http://<Rechner>:8787/anlage öffnen.
+services:
+  sungrow-steuerung:
+    image: ghcr.io/DEIN-GITHUB-NAME/sungrow-steuerung:latest
+    # oder selbst bauen:  build: .
+    container_name: sungrow-steuerung
+    restart: unless-stopped          # nach dem Speichern auf der Seite Anlage beendet sich das Programm, Docker startet es neu
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./daten:/data                # config.json und data/ bleiben hier erhalten
+    environment:
+      - TZ=Europe/Berlin

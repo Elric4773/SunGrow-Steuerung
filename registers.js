@@ -194,7 +194,8 @@ function mainInverter(c) { return normalizeInverters(c).filter(function (i) { re
 /* Für die Konsolenwerkzeuge: Hauptwechselrichter aus config.json im Programmordner */
 function cliTarget(dir) {
   let c = {};
-  try { c = JSON.parse(require('fs').readFileSync(require('path').join(dir, 'config.json'), 'utf8')); } catch (e) { return null; }
+  const confDir = process.env.SUNGROW_CONFIG_DIR || dir;
+  try { c = JSON.parse(require('fs').readFileSync(require('path').join(confDir, 'config.json'), 'utf8')); } catch (e) { return null; }
   const m = mainInverter(c); if (!m || !m.host) return null;
   return { host: m.host, port: m.port || 502, unitId: m.unitId === undefined ? 1 : m.unitId, name: m.name || 'Hybrid', ratedPower: m.ratedPower || 10600,
     webPort: (c.http && c.http.port) || 8787, A: function (key) { return addressOf(m, key); } };

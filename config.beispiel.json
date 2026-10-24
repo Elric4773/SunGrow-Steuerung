@@ -1,7 +1,10 @@
 {
   "plantName": "Meine Anlage",
-  "http": { "port": 8787 },
+  "http": {
+    "port": 8787
+  },
   "pollSeconds": 10,
+  "_hinweis": "Beispiel mit Platzhaltern. Die echte config.json entsteht auf der Seite Anlage und gehört nicht auf GitHub.",
   "inverters": [
     {
       "name": "Hybrid",
@@ -30,9 +33,114 @@
     "username": "BENUTZERNAME",
     "password": "PASSWORT"
   },
-  "battery": { "enabled": false },
+  "battery": {
+    "enabled": false
+  },
   "moduleCount": 8,
   "topModuleIndex": 8,
   "moduleNotes": {},
-  "matching": { "targetModule": 8 }
+  "matching": {
+    "targetModule": 8
+  },
+  "heatpump": {
+    "enabled": false,
+    "name": "Wärmepumpe",
+    "model": "weishaupt",
+    "host": "192.0.2.20",
+    "port": 8899,
+    "unitId": 1,
+    "framing": "rtu",
+    "pollSeconds": 30,
+    "writeEnabled": false,
+    "shift": {
+      "min": -3,
+      "max": 5
+    },
+    "registers": {}
+  },
+  "prices": {
+    "exchange": "awattar",
+    "fixedCt": 18.5,
+    "vatPercent": 19,
+    "feedInCt": 8.1,
+    "fallbackCt": 30,
+    "zone": "DE-LU",
+    "url": ""
+  },
+  "forecast": {
+    "provider": "openmeteo",
+    "lat": 51.0,
+    "lon": 7.0,
+    "planes": [
+      {
+        "name": "Süddach",
+        "kwp": 9.8,
+        "azimuth": 0,
+        "tilt": 35
+      }
+    ],
+    "performanceRatio": 0.85,
+    "urlWeather": "",
+    "urlSolar": ""
+  },
+  "planner": {
+    "mode": "off",
+    "horizonHours": 36,
+    "capacityKwh": 0,
+    "minSoc": 10,
+    "maxSoc": 100,
+    "chargeW": 5000,
+    "dischargeW": 5000,
+    "pvChargeW": 10000,
+    "efficiency": 0.88,
+    "marginCt": 2,
+    "baseLoadW": 400,
+    "tickSeconds": 60,
+    "heat": {
+      "enabled": false,
+      "limitTemp": 15,
+      "wattsPerKelvin": 100,
+      "kwPerShiftK": 0.15,
+      "storeHours": 4,
+      "shiftUp": 3,
+      "shiftDown": -2,
+      "surplusW": 1500,
+      "cheapPct": 25,
+      "expensivePct": 25
+    }
+  },
+  "meters": [
+    {
+      "name": "Haus",
+      "enabled": true,
+      "role": "house",
+      "source": "loxone",
+      "host": "192.0.2.30",
+      "port": 80,
+      "username": "BENUTZER",
+      "password": "PASSWORT",
+      "object": "Zaehler_Haus",
+      "scale": 1,
+      "invert": false,
+      "pollSeconds": 10
+    },
+    {
+      "name": "Wallbox",
+      "enabled": false,
+      "role": "car",
+      "source": "modbus",
+      "host": "192.0.2.31",
+      "port": 8899,
+      "unitId": 3,
+      "framing": "rtu",
+      "template": "sdm630",
+      "fc": 4,
+      "addr": 12,
+      "doc": 30013,
+      "type": "f32",
+      "scale": 1,
+      "invert": false,
+      "pollSeconds": 10
+    }
+  ]
 }

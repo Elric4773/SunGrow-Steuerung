@@ -57,6 +57,11 @@ summary{cursor:pointer;font-weight:600}
 .regwrap{overflow-x:auto}
 .seg{display:inline-flex;border:2px solid var(--ink);flex-wrap:wrap} .seg button{font:inherit;font-size:16px;padding:6px 16px;border:0;background:none;color:var(--ink);cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.regs select{min-height:30px;padding:2px 4px;width:auto} .regs input.sc{width:70px}
+.plane{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr auto;gap:10px;align-items:end;margin-top:10px} .plane .b{min-height:36px}
+.adv{margin-top:12px} .adv summary{font-weight:500;color:var(--muted)}
+.sub2{font-size:15px;color:var(--muted);margin:14px 0 6px;font-weight:600}
+@media (max-width:640px){.plane{grid-template-columns:1fr 1fr}}
 .bar{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:2px solid var(--ink);padding:12px 24px;z-index:5}
 .bar .in{max-width:1200px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
 .bar .msg{flex:1 1 300px;font-size:15px} .bar .msg .bad{color:var(--alert)}
@@ -67,12 +72,14 @@ summary{cursor:pointer;font-weight:600}
 [hidden]{display:none!important}
 @media (max-width:640px){.wrap{padding:16px 16px 140px}.top a{padding:7px 12px;font-size:16px}.inv .ih .acts{margin-left:0}}
 </style>
+<link rel="stylesheet" href="/skins.css">
+<script src="/skins.js"></script>
 </head>
 <body>
 <div class="wrap">
-  <nav class="top" aria-label="Bereiche"><a href="/">Monitor</a><a href="/einstellungen">Einstellungen</a><a href="/matching">Matching</a><a href="/anlage" aria-current="page">Anlage</a><span class="copy">(C) by Elric M.</span></nav>
+  <nav class="top" aria-label="Bereiche"><a href="/">Monitor</a><a href="/einstellungen">Einstellungen</a><a href="/matching">Matching</a><a href="/planer">Planer</a><a href="/anlage" aria-current="page">Anlage</a><span class="copy">(C) by Elric M.</span></nav>
   <h1>Anlage einrichten</h1>
-  <p class="lead">Wechselrichter, Registeradressen, WiNet-S und Batterie. Gespeichert wird in config.json, danach startet die Steuerung neu.</p>
+  <p class="lead">Wechselrichter, Register, WiNet-S, Batterie, Wärmepumpe, Strompreis, Prognose und Planer. Gespeichert wird in config.json, danach startet die Steuerung neu.</p>
   <div class="banner" id="firstRun" hidden><b>Noch nicht eingerichtet.</b> Lege zuerst ein Passwort für diese Seite fest und trage dann mindestens den Hybridwechselrichter ein. Monitor, Einstellungen und Matching laufen, sobald gespeichert ist.</div>
   <div class="banner bad" id="loadErr" hidden></div>
 
@@ -132,7 +139,9 @@ summary{cursor:pointer;font-weight:600}
       </div>
       <div id="modbusBox" style="margin-top:16px" hidden>
         <div class="grid">
-          <label class="f"><span>Geräteadresse der Batterie</span><input type="number" id="mUnit" min="0" max="247"><small>Standard 200, Verbindung über den Hybrid</small></label>
+          <label class="f"><span>Adresse der Batterie</span><input type="text" id="mHost" placeholder="leer = wie der Hybrid"><small>auch ein Modbus-Proxy ist möglich</small></label>
+          <label class="f"><span>Port</span><input type="number" id="mPort" min="1" max="65535"><small>Standard 502, beim Proxy z. B. 5020</small></label>
+          <label class="f"><span>Geräteadresse der Batterie</span><input type="number" id="mUnit" min="0" max="247"><small>Standard 200</small></label>
           <label class="f"><span>Zellblock ab Adresse</span><input type="number" id="mAddr" min="0" max="65535"><small>Standard 10756</small></label>
         </div>
       </div>
@@ -148,6 +157,119 @@ summary{cursor:pointer;font-weight:600}
       <h3 style="margin-top:18px">Notizen je Modul</h3>
       <p class="hint" style="margin-top:2px">Optional, zum Beispiel „neu“. Ein Modul mit Notiz wird im Moduldiagramm hervorgehoben.</p>
       <div class="grid" id="notes" style="margin-top:10px"></div>
+    </section>
+
+
+    <section class="panel" aria-labelledby="hMt">
+      <div class="phead"><div><h2 id="hMt">Messgeräte</h2>
+        <p>Leistungsmesser für den Energiefluss und das Lernen des Planers: Zähler wie der Eastron SDM630 direkt per Modbus, über einen Loxone Miniserver oder über eine JSON-Schnittstelle (Shelly, Tasmota, Wallbox). Jedes Messgerät bekommt eine Rolle; gemessene Werte haben Vorrang vor gerechneten.</p></div>
+        <div class="acts"><button class="b" type="button" id="addMeter">Messgerät hinzufügen</button></div></div>
+      <div id="meters"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="hHp">
+      <div class="phead"><div><h2 id="hHp">Wärmepumpe</h2>
+        <p>Über Modbus, meist per RS485-Ethernet-Umsetzer am BMS-Anschluss des Reglers. Gelesen werden die eingeschalteten Register. <b>Geschrieben wird nur eines:</b> die Sollwert-Verschiebung PV (Smart Grid), sie liegt im RAM des Reglers. Sollwerte, Heizkurve und Betriebsart bleiben Leseregister, weil sie im EEPROM landen und der nur wenige Schreibzyklen verträgt.</p></div>
+        <label class="chk"><input type="checkbox" id="hpOn"> Wärmepumpe aktiv</label></div>
+      <div id="hpBox">
+        <div class="grid">
+          <label class="f"><span>Name</span><input type="text" id="hpName" maxlength="40"></label>
+          <label class="f"><span>Typ</span><select id="hpModel"></select></label>
+          <label class="f"><span>IP-Adresse des Umsetzers</span><input type="text" id="hpHost" placeholder="z. B. 192.0.2.20"><small>RS485-Ethernet-Umsetzer oder Ethernet-Karte des Reglers</small></label>
+          <label class="f"><span>Port</span><input type="number" id="hpPort" min="1" max="65535"><small>Standard 502, bei Umsetzern oft 8899 oder 4196</small></label>
+          <label class="f"><span>Rahmenformat</span><select id="hpFraming"><option value="rtu">Modbus RTU über TCP (transparenter Umsetzer)</option><option value="tcp">Modbus TCP (Gateway oder Ethernet-Karte)</option></select><small>Umsetzer im „transparenten“ Betrieb: RTU. Serielle Einstellungen wie Baudrate stellt der Umsetzer selbst ein.</small></label>
+          <label class="f"><span>Geräteadresse (Unit)</span><input type="number" id="hpUnit" min="0" max="247"><small>wie im Regler unter Einstellungen → Netzwerk → Adresse</small></label>
+          <label class="f"><span>Abfrage alle … Sekunden</span><input type="number" id="hpPoll" min="5" max="600"><small>Standard 30</small></label>
+        </div>
+        <p class="sub2">Schreiben</p>
+        <div class="grid">
+          <label class="chk" style="align-self:center"><input type="checkbox" id="hpWrite"> Schreiben erlauben (Sollwert-Verschiebung PV)</label>
+          <label class="f"><span>Verschiebung höchstens, K</span><input type="number" id="hpShMax" min="0" max="15" step="0.5"><small>Anheben, z. B. 5</small></label>
+          <label class="f"><span>Verschiebung mindestens, K</span><input type="number" id="hpShMin" min="-10" max="0" step="0.5"><small>Absenken, z. B. −3</small></label>
+        </div>
+        <div class="acts" style="margin-top:14px"><button class="b" type="button" id="testHp">Verbindung testen</button></div>
+        <p class="res" id="rHp"></p>
+        <details id="hpRegs"><summary>Register</summary>
+          <p class="hint">Doku-Nr. wie in der Registerliste des Herstellers: 30001–39999 sind Input-Register (lesen), 40001–49999 Holding-Register. Format s16 = mit Vorzeichen, u16 = ohne. Ausgeschaltete Register werden nicht abgefragt. Nur bekannte und eingeschaltete Register kommen in die Abfrage; unbekannte Adressen meldet der Test als Modbus-Ausnahme 2.</p>
+          <div class="acts" style="margin-top:8px"><button class="b" type="button" id="hpReset">Standard wiederherstellen</button></div>
+          <div class="regwrap"><table class="regs"><thead><tr><th>Wert</th><th>Ein</th><th>Doku-Nr.</th><th>Art</th><th>Format</th><th>Faktor</th><th>Einheit</th><th>Testwert</th></tr></thead><tbody id="hpRows"></tbody></table></div>
+        </details>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="hPr">
+      <div class="phead"><div><h2 id="hPr">Strompreis</h2>
+        <p>Für dynamische Tarife (z. B. Rabot Energy, Tibber, aWATTar). Der Börsenpreis kommt öffentlich von aWATTar oder Energy-Charts, die festen Bestandteile stehen auf deiner Rechnung: Netzentgelt, Stromsteuer, Umlagen, Konzessionsabgabe und der Aufschlag des Anbieters, alles netto in ct/kWh. Endpreis = (Börse + feste Bestandteile) × (1 + MwSt).</p></div></div>
+      <div class="seg" role="group" aria-label="Strombörse" id="prSource">
+        <button type="button" data-v="awattar">aWATTar (stündlich)</button><button type="button" data-v="energycharts">Energy-Charts (viertelstündlich)</button><button type="button" data-v="none">fester Preis</button>
+      </div>
+      <div class="grid" style="margin-top:16px">
+        <label class="f" data-pr="dyn"><span>Feste Bestandteile netto, ct/kWh</span><input type="number" id="prFixed" min="0" max="100" step="0.01"><small>Netz, Steuern, Umlagen, Aufschlag</small></label>
+        <label class="f" data-pr="dyn"><span>Mehrwertsteuer, %</span><input type="number" id="prVat" min="0" max="30" step="0.1"><small>Deutschland 19</small></label>
+        <label class="f" data-pr="fix"><span>Fester Arbeitspreis brutto, ct/kWh</span><input type="number" id="prFallback" min="0" max="200" step="0.01"><small>gilt auch als Ersatz, wenn die Börse nicht erreichbar ist</small></label>
+        <label class="f"><span>Einspeisevergütung, ct/kWh</span><input type="number" id="prFeed" min="0" max="100" step="0.01"><small>was eingespeister Strom bringt</small></label>
+        <label class="f" data-pr="ec"><span>Gebotszone</span><input type="text" id="prZone" maxlength="10"><small>Standard DE-LU</small></label>
+      </div>
+      <details class="adv"><summary>Erweitert</summary><div class="grid" style="margin-top:10px">
+        <label class="f"><span>Eigene Adresse der Schnittstelle</span><input type="text" id="prUrl" placeholder="leer = Standard"><small>nur, wenn sich die Adresse des Dienstes ändert</small></label>
+      </div></details>
+      <div class="acts" style="margin-top:14px"><button class="b" type="button" id="testPr">Börse abfragen</button></div>
+      <p class="res" id="rPr"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="hFc">
+      <div class="phead"><div><h2 id="hFc">Prognose</h2>
+        <p>Wetter und PV-Ertrag für die nächsten Tage. Open-Meteo liefert Temperatur und Einstrahlung je Dachfläche, daraus rechnet die Steuerung den Ertrag und lernt über die Wochen aus dem gemessenen Tagesertrag nach. Alternativ liefert forecast.solar die PV-Prognose fertig.</p></div></div>
+      <div class="grid">
+        <label class="f"><span>Breitengrad</span><input type="number" id="fcLat" min="-90" max="90" step="0.0001" placeholder="z. B. 50.11"><small>Dezimalgrad, aus der Karten-App</small></label>
+        <label class="f"><span>Längengrad</span><input type="number" id="fcLon" min="-180" max="180" step="0.0001" placeholder="z. B. 8.68"></label>
+        <label class="f"><span>PV-Prognose von</span><select id="fcProv"><option value="openmeteo">Open-Meteo (berechnet, ohne Limit)</option><option value="forecastsolar">forecast.solar (fertig, 12 Abrufe je Stunde)</option></select></label>
+        <label class="f"><span>Anlagenwirkungsgrad</span><input type="number" id="fcPr" min="0.3" max="1.2" step="0.01"><small>Standard 0,85; der Lernfaktor korrigiert den Rest</small></label>
+      </div>
+      <p class="sub2">Dachflächen</p>
+      <div id="planes"></div>
+      <div class="acts" style="margin-top:10px"><button class="b" type="button" id="addPlane">Dachfläche hinzufügen</button></div>
+      <details class="adv"><summary>Erweitert</summary><div class="grid" style="margin-top:10px">
+        <label class="f"><span>Adresse Wetterdienst</span><input type="text" id="fcUrlW" placeholder="leer = Open-Meteo"></label>
+        <label class="f"><span>Adresse forecast.solar</span><input type="text" id="fcUrlS" placeholder="leer = Standard"></label>
+      </div></details>
+      <div class="acts" style="margin-top:14px"><button class="b" type="button" id="testFc">Prognose abrufen</button></div>
+      <p class="res" id="rFc"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="hPl">
+      <div class="phead"><div><h2 id="hPl">Planer</h2>
+        <p>Rechnet alle Viertelstunde den günstigsten Fahrplan für die nächsten Stunden. In der Simulation wird nur protokolliert, was er tun würde. Die Betriebsart lässt sich auch direkt auf der Seite Planer umschalten.</p></div></div>
+      <div class="seg" role="group" aria-label="Betriebsart des Planers" id="plMode">
+        <button type="button" data-v="off">Aus</button><button type="button" data-v="simulate">Simulation</button><button type="button" data-v="active">Aktiv</button>
+      </div>
+      <p class="sub2">Batterie</p>
+      <div class="grid">
+        <label class="f"><span>Kapazität, kWh</span><input type="number" id="plCap" min="0" max="500" step="0.1"><small>0 = aus dem Wechselrichter lesen</small></label>
+        <label class="f"><span>Untere Ladegrenze, %</span><input type="number" id="plMin" min="0" max="90"><small>Reserve, die der Planer nie anrührt</small></label>
+        <label class="f"><span>Obere Ladegrenze, %</span><input type="number" id="plMax" min="20" max="100"></label>
+        <label class="f"><span>Laden aus dem Netz höchstens, W</span><input type="number" id="plCh" min="100" max="50000" step="100"></label>
+        <label class="f"><span>Entladen höchstens, W</span><input type="number" id="plDis" min="100" max="50000" step="100"></label>
+        <label class="f"><span>Laden aus PV höchstens, W</span><input type="number" id="plPv" min="100" max="50000" step="100"></label>
+        <label class="f"><span>Wirkungsgrad Laden und Entladen</span><input type="number" id="plEff" min="0.5" max="1" step="0.01"><small>Standard 0,88</small></label>
+        <label class="f"><span>Mindestvorteil je kWh, ct</span><input type="number" id="plMargin" min="0" max="30" step="0.5"><small>Abschlag für Netzladung, damit sich kein Hin und Her lohnt</small></label>
+        <label class="f"><span>Planungshorizont, Stunden</span><input type="number" id="plHor" min="12" max="72"><small>Standard 36; über die bekannten Preise hinaus wird aus dem Wochentagsmuster geschätzt</small></label>
+        <label class="f"><span>Grundlast ohne Verlauf, W</span><input type="number" id="plBase" min="0" max="20000" step="50"><small>bis das Lastprofil gelernt ist</small></label>
+        <label class="f"><span>Takt, Sekunden</span><input type="number" id="plTick" min="10" max="600"><small>Standard 60</small></label>
+      </div>
+      <p class="sub2">Wärmepumpe</p>
+      <div class="grid">
+        <label class="chk" style="align-self:center"><input type="checkbox" id="plHeat"> Wärmepumpe mitplanen</label>
+        <label class="f"><span>Heizgrenze, °C</span><input type="number" id="plLimit" min="-5" max="25" step="0.5"><small>darüber wird nicht geheizt</small></label>
+        <label class="f"><span>Leistung je Kelvin, W</span><input type="number" id="plWpk" min="10" max="2000" step="10"><small>Annahme, bis gemessen: elektrische Leistung je Grad unter der Heizgrenze</small></label>
+        <label class="f"><span>Mehrleistung je K Verschiebung, kW</span><input type="number" id="plKpk" min="0.01" max="5" step="0.01"><small>Standard 0,15</small></label>
+        <label class="f"><span>Wärme speichern, Stunden</span><input type="number" id="plStore" min="0.5" max="12" step="0.5"><small>wie lange eingelagerte Wärme vorhält (Estrich, Puffer)</small></label>
+        <label class="f"><span>Anheben, K</span><input type="number" id="plUp" min="0" max="15" step="0.5"></label>
+        <label class="f"><span>Absenken, K</span><input type="number" id="plDown" min="-10" max="0" step="0.5"></label>
+        <label class="f"><span>PV-Überschuss ab, W</span><input type="number" id="plSur" min="0" max="30000" step="100"><small>bei voller Batterie heizt die Wärmepumpe mit Überschuss</small></label>
+        <label class="f"><span>Billigste Stunden, %</span><input type="number" id="plCheap" min="5" max="50"></label>
+        <label class="f"><span>Teuerste Stunden, %</span><input type="number" id="plExp" min="5" max="50"></label>
+      </div>
     </section>
 
     <section class="panel gate" aria-labelledby="hAcc">
@@ -173,7 +295,7 @@ summary{cursor:pointer;font-weight:600}
 var $=function(id){return document.getElementById(id);};
 var esc=function(s){return String(s===undefined||s===null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
 var nf=function(v,d){return v===null||v===undefined||isNaN(v)?'–':Number(v).toLocaleString('de-DE',{minimumFractionDigits:0,maximumFractionDigits:d});};
-var TYPES=null, MAXMOD=8, C=null, orig='', status=null;
+var TYPES=null, MAXMOD=8, C=null, orig='', status=null, HPT=[], HPD=[], PLD=null, MTT=[], MTR={}, MTY=[];
 
 function api(path, body){
   var o = body===undefined ? {cache:'no-store'} : {method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'sungrow'},body:JSON.stringify(body)};
@@ -206,7 +328,9 @@ $('logout').onclick=function(){ api('logout',{}).then(function(){ location.reloa
 function loadConfig(){
   api('config').then(function(j){
     if(j._status===401){ show('editor',false); show('bar',false); show('login',true); return; }
-    TYPES=j.types; MAXMOD=j.maxModules||8; C=j.config;
+    TYPES=j.types; MAXMOD=j.maxModules||8; C=j.config; HPT=j.heatpumpTypes||[]; HPD=j.heatpumpDefaults||[]; PLD=j.plannerDefaults; MTT=j.meterTemplates||[]; MTR=j.meterRoles||{}; MTY=j.meterTypes||[];
+    C.meters=(C.meters||[]).map(function(m){ m.password=''; m._test=null; return m; });
+    C.heatpump._test=null; C.heatpump.registers.forEach(function(r){ r.doc=r.doc; });
     C.inverters.forEach(function(i){ i.registers=fullRegs(i.type,i.registers); i._open=false; i._test=null; });
     if(!C.inverters.length) C.inverters.push(newInv('hybrid'));
     C.winet.password='';
@@ -223,9 +347,12 @@ function payload(){
   return { plantName:C.plantName, httpPort:+C.httpPort, pollSeconds:+C.pollSeconds,
     inverters:C.inverters.map(function(i){ var o={name:i.name,enabled:i.enabled,type:i.type,host:i.host,port:+i.port,unitId:+i.unitId,registers:i.registers}; if(i.type==='hybrid') o.ratedPower=+i.ratedPower; else o.addToHouseLoad=i.addToHouseLoad; return o; }),
     cellSource:C.cellSource, winet:{host:C.winet.host,port:+C.winet.port,username:C.winet.username,password:C.winet.password,intervalSeconds:+C.winet.intervalSeconds,paramAddress:+C.winet.paramAddress,paramCount:+C.winet.paramCount},
-    modbusBattery:{unitId:+C.modbusBattery.unitId,cellBlockAddress:+C.modbusBattery.cellBlockAddress},
-    moduleCount:+C.moduleCount, topModuleIndex:+C.topModuleIndex, targetModule:+C.targetModule, moduleNotes:C.moduleNotes };
+    modbusBattery:{host:C.modbusBattery.host,port:+C.modbusBattery.port,unitId:+C.modbusBattery.unitId,cellBlockAddress:+C.modbusBattery.cellBlockAddress},
+    moduleCount:+C.moduleCount, topModuleIndex:+C.topModuleIndex, targetModule:+C.targetModule, moduleNotes:C.moduleNotes,
+    meters:C.meters.map(function(m){ var o={}; Object.keys(m).forEach(function(k){ if(k.charAt(0)!=='_'&&k!=='passwordSet') o[k]=m[k]; }); return o; }), heatpump:hpPayload(), prices:C.prices, forecast:{provider:C.forecast.provider,lat:C.forecast.lat,lon:C.forecast.lon,planes:C.forecast.planes,performanceRatio:C.forecast.performanceRatio,urlWeather:C.forecast.urlWeather,urlSolar:C.forecast.urlSolar}, planner:C.planner };
 }
+function hpPayload(){ var h=C.heatpump; return { enabled:h.enabled, name:h.name, model:h.model, host:h.host, port:+h.port, unitId:+h.unitId, framing:h.framing, pollSeconds:+h.pollSeconds, writeEnabled:h.writeEnabled, shift:{min:+h.shift.min,max:+h.shift.max},
+  registers:h.registers.map(function(r){ return {key:r.key,doc:r.doc,type:r.type,scale:r.scale,on:r.on}; }) }; }
 function changed(){
   var dirty = snapshot()!==orig;
   $('save').disabled=!dirty; $('discard').disabled=!dirty;
@@ -246,7 +373,7 @@ function render(){
   bindVal('wInt',C.winet,'intervalSeconds',true); bindVal('wAddr',C.winet,'paramAddress',true); bindVal('wCount',C.winet,'paramCount',true);
   $('wPass').placeholder=C.winet.passwordSet?'unverändert lassen':'';
   $('wPassHint').textContent=C.winet.passwordSet?'Ein Passwort ist gespeichert. Leer lassen, um es zu behalten.':'Noch kein Passwort gespeichert.';
-  bindVal('mUnit',C.modbusBattery,'unitId',true); bindVal('mAddr',C.modbusBattery,'cellBlockAddress',true);
+  bindVal('mHost',C.modbusBattery,'host'); bindVal('mPort',C.modbusBattery,'port',true); bindVal('mUnit',C.modbusBattery,'unitId',true); bindVal('mAddr',C.modbusBattery,'cellBlockAddress',true);
   var opts=function(n,sel){ var h=''; for(var i=1;i<=n;i++) h+='<option value="'+i+'"'+(i===+sel?' selected':'')+'>'+i+'</option>'; return h; };
   $('modCount').innerHTML=opts(MAXMOD,C.moduleCount); $('modTop').innerHTML=opts(+C.moduleCount,C.topModuleIndex); $('modTarget').innerHTML=opts(+C.moduleCount,C.targetModule);
   $('modCount').onchange=function(){ C.moduleCount=+this.value; if(C.topModuleIndex>C.moduleCount) C.topModuleIndex=C.moduleCount; if(C.targetModule>C.moduleCount) C.targetModule=C.moduleCount; render(); changed(); };
@@ -255,7 +382,138 @@ function render(){
   var nh=''; for(var m=1;m<=+C.moduleCount;m++) nh+='<label class="f"><span>Modul '+m+'</span><input type="text" maxlength="40" data-m="'+m+'" value="'+esc(C.moduleNotes[m]||'')+'"></label>';
   $('notes').innerHTML=nh;
   Array.prototype.forEach.call($('notes').querySelectorAll('input'),function(el){ el.oninput=function(){ var m=el.getAttribute('data-m'); if(el.value.trim()) C.moduleNotes[m]=el.value; else delete C.moduleNotes[m]; changed(); }; });
+  renderMeters(); renderHp(); renderPrices(); renderForecast(); renderPlanner();
   changed();
+}
+
+/* ---------- Messgeräte ---------- */
+function newMeter(){ var t=MTT[0]||{}; return { name:'Zähler '+(C.meters.length+1), enabled:true, role:'custom', source:'modbus', host:'', port:502, unitId:t.unitId||1, framing:'rtu', template:t.id||'generic', doc:t.doc||30013, type:t.type||'f32', scale:1, invert:false, pollSeconds:10, username:'', password:'', object:'', url:'', path:'', _test:null }; }
+function renderMeters(){
+  var box=$('meters'); box.innerHTML='';
+  if(!C.meters.length) box.innerHTML='<p class="hint">Noch kein Messgerät. Ohne Messgeräte rechnet der Energiefluss Haus und Wärmepumpe aus den Werten des Wechselrichters.</p>';
+  C.meters.forEach(function(m,idx){
+    var el=document.createElement('div'); el.className='inv'+(m.enabled?'':' off');
+    var roles=Object.keys(MTR).map(function(k){ return '<option value="'+k+'"'+(m.role===k?' selected':'')+'>'+esc(MTR[k])+'</option>'; }).join('');
+    var src=m.source, h='<div class="ih"><h3>'+esc(m.name||'(ohne Namen)')+'</h3><span class="tag">'+esc(MTR[m.role]||m.role)+'</span><label class="chk"><input type="checkbox" data-k="enabled"'+(m.enabled?' checked':'')+'> aktiv</label>'+
+      '<div class="acts"><button class="b" type="button" data-a="test">Wert lesen</button><button class="b danger" type="button" data-a="del">Entfernen</button></div></div><div class="grid">'+
+      '<label class="f"><span>Name</span><input type="text" maxlength="40" data-k="name" value="'+esc(m.name)+'"></label>'+
+      '<label class="f"><span>Rolle</span><select data-k="role">'+roles+'</select><small>Haus, Wärmepumpe und E-Auto werden im Energiefluss zugeordnet</small></label>'+
+      '<label class="f"><span>Quelle</span><select data-k="source"><option value="modbus"'+(src==='modbus'?' selected':'')+'>Modbus (TCP oder RTU über TCP)</option><option value="loxone"'+(src==='loxone'?' selected':'')+'>Loxone Miniserver</option><option value="http"'+(src==='http'?' selected':'')+'>HTTP / JSON</option></select></label>'+
+      '<label class="f"><span>Abfrage alle … Sekunden</span><input type="number" min="5" max="600" data-k="pollSeconds" value="'+esc(m.pollSeconds)+'"></label>';
+    if(src==='modbus') h+='<label class="f"><span>Vorlage</span><select data-k="template">'+MTT.map(function(t){ return '<option value="'+t.id+'"'+(m.template===t.id?' selected':'')+'>'+esc(t.label)+'</option>'; }).join('')+'</select></label>'+
+      '<label class="f"><span>IP-Adresse des Umsetzers</span><input type="text" data-k="host" value="'+esc(m.host)+'"></label><label class="f"><span>Port</span><input type="number" min="1" max="65535" data-k="port" value="'+esc(m.port)+'"></label>'+
+      '<label class="f"><span>Rahmenformat</span><select data-k="framing"><option value="rtu"'+(m.framing!=='tcp'?' selected':'')+'>RTU über TCP</option><option value="tcp"'+(m.framing==='tcp'?' selected':'')+'>Modbus TCP</option></select></label>'+
+      '<label class="f"><span>Geräteadresse (Unit)</span><input type="number" min="0" max="247" data-k="unitId" value="'+esc(m.unitId)+'"></label>'+
+      '<label class="f"><span>Doku-Nr. des Registers</span><input type="number" min="0" max="65535" data-k="doc" value="'+esc(m.doc)+'"><small>SDM630: 30013 Gesamtwirkleistung</small></label>'+
+      '<label class="f"><span>Format</span><select data-k="type">'+MTY.map(function(t){ return '<option value="'+t+'"'+(m.type===t?' selected':'')+'>'+t+'</option>'; }).join('')+'</select><small>f32 = Float, hohes Wort zuerst (Eastron); …le = Wortfolge getauscht</small></label>';
+    else if(src==='loxone') h+='<label class="f"><span>Adresse des Miniservers</span><input type="text" data-k="host" value="'+esc(m.host)+'"></label><label class="f"><span>Port</span><input type="number" min="1" max="65535" data-k="port" value="'+esc(m.port||80)+'"><small>Standard 80</small></label>'+
+      '<label class="f"><span>Benutzer</span><input type="text" data-k="username" autocomplete="off" value="'+esc(m.username)+'"></label><label class="f"><span>Passwort</span><input type="password" data-k="password" autocomplete="new-password" placeholder="'+(m.passwordSet?'unverändert lassen':'')+'"></label>'+
+      '<label class="f"><span>Objektname in Loxone Config</span><input type="text" data-k="object" value="'+esc(m.object)+'"><small>Name des Modbus-Eingangs, z. B. Zaehler_Haus (keine Umlaute, eindeutig)</small></label>';
+    else h+='<label class="f" style="grid-column:span 2"><span>Adresse (URL)</span><input type="text" data-k="url" value="'+esc(m.url)+'" placeholder="http://…/status"></label>'+
+      '<label class="f"><span>Pfad zum Wert</span><input type="text" data-k="path" value="'+esc(m.path)+'" placeholder="z. B. emeters.0.power"><small>Felder mit Punkt trennen, Listen mit Nummer</small></label>'+
+      '<label class="f"><span>Benutzer (optional)</span><input type="text" data-k="username" autocomplete="off" value="'+esc(m.username)+'"></label><label class="f"><span>Passwort</span><input type="password" data-k="password" autocomplete="new-password" placeholder="'+(m.passwordSet?'unverändert lassen':'')+'"></label>';
+    h+='<label class="f"><span>Faktor</span><input type="number" step="any" data-k="scale" value="'+esc(m.scale)+'"><small>Ergebnis in Watt; 1000 bei Werten in kW</small></label>'+
+      '<label class="chk" style="align-self:end;padding-bottom:22px"><input type="checkbox" data-k="invert"'+(m.invert?' checked':'')+'> Vorzeichen umdrehen</label></div><div class="res" data-r="res"></div>';
+    el.innerHTML=h; box.appendChild(el);
+    var r=el.querySelector('[data-r="res"]'); if(m._test){ r.innerHTML=m._test.pending?'lese …':m._test.ok?'<span class="ok">Gelesen: '+nf(m._test.watts,0)+' W</span>':'<span class="bad">'+esc(m._test.error)+'</span>'; }
+    Array.prototype.forEach.call(el.querySelectorAll('[data-k]'),function(f){ var k=f.getAttribute('data-k');
+      var upd=function(){ if(f.type==='checkbox') m[k]=f.checked; else if(f.type==='number') m[k]=f.value===''?'':Number(f.value); else m[k]=f.value;
+        if(k==='template'){ var t=MTT.filter(function(x){return x.id===m.template;})[0]; if(t&&t.id!=='generic'){ m.doc=t.doc; m.type=t.type; m.unitId=t.unitId; } renderMeters(); }
+        else if(k==='source'||k==='enabled'||k==='role') renderMeters(); else if(k==='name') el.querySelector('h3').textContent=m.name||'(ohne Namen)'; changed(); };
+      f.onchange=upd; if(f.tagName==='INPUT'&&f.type!=='checkbox') f.oninput=upd; });
+    el.querySelector('[data-a="test"]').onclick=function(){ var b=this; b.disabled=true; m._test={pending:true}; renderMeters();
+      var o={}; Object.keys(m).forEach(function(k){ if(k.charAt(0)!=='_'&&k!=='passwordSet') o[k]=m[k]; });
+      api('test-meter',{meter:o}).then(function(j){ m._test=j; renderMeters(); }).catch(function(e){ m._test={ok:false,error:e.message}; renderMeters(); }); };
+    el.querySelector('[data-a="del"]').onclick=function(){ if(window.confirm('Messgerät „'+(m.name||'')+'“ entfernen?')){ C.meters.splice(idx,1); renderMeters(); changed(); } };
+  });
+}
+$('addMeter').onclick=function(){ C.meters.push(newMeter()); renderMeters(); changed(); };
+
+/* ---------- Wärmepumpe ---------- */
+function renderHp(){
+  var h=C.heatpump;
+  $('hpOn').checked=h.enabled; $('hpOn').onchange=function(){ h.enabled=this.checked; show('hpBox',h.enabled); changed(); }; show('hpBox',h.enabled);
+  $('hpModel').innerHTML=HPT.map(function(t){ return '<option value="'+esc(t.id)+'"'+(t.id===h.model?' selected':'')+'>'+esc(t.label)+'</option>'; }).join('');
+  $('hpModel').onchange=function(){ h.model=this.value; changed(); };
+  bindVal('hpName',h,'name'); bindVal('hpHost',h,'host'); bindVal('hpPort',h,'port',true); bindVal('hpUnit',h,'unitId',true); bindVal('hpPoll',h,'pollSeconds',true);
+  $('hpFraming').value=h.framing; $('hpFraming').onchange=function(){ h.framing=this.value; changed(); };
+  $('hpWrite').checked=h.writeEnabled; $('hpWrite').onchange=function(){ h.writeEnabled=this.checked; changed(); };
+  bindVal('hpShMax',h.shift,'max',true); bindVal('hpShMin',h.shift,'min',true);
+  renderHpRows();
+  $('testHp').onclick=function(){ var b=this; b.disabled=true; h._test={pending:true}; renderHpTest();
+    api('test-heatpump',{heatpump:hpPayload()}).then(function(j){ h._test=j; $('hpRegs').open=$('hpRegs').open||!!j.rows; renderHpRows(); renderHpTest(); }).catch(function(e){ h._test={ok:false,error:e.message}; renderHpTest(); }).then(function(){ b.disabled=false; }); };
+  $('hpReset').onclick=function(){ h.registers.forEach(function(r){ var d=HPD.filter(function(x){return x.key===r.key;})[0]; if(d){ r.doc=d.doc; r.type=d.type; r.scale=d.scale; r.on=d.on; } }); renderHpRows(); changed(); };
+  renderHpTest();
+}
+function renderHpTest(){
+  var t=C.heatpump._test, r=$('rHp'); if(!t){ r.innerHTML=''; return; } if(t.pending){ r.innerHTML='lese alle eingeschalteten Register …'; return; }
+  r.innerHTML=(t.ok?'<span class="ok">Verbindung steht, '+t.read+' von '+t.total+' Registern gelesen.</span>':'<span class="bad">'+esc(t.error||'Fehler')+'</span>'+(t.total?' ('+(t.read||0)+' von '+t.total+' gelesen)':''))+(t.notes&&t.notes.length?'<ul>'+t.notes.map(function(n){return '<li class="bad">'+esc(n)+'</li>';}).join('')+'</ul>':'')+(t.rows?' Die Werte stehen in der Registertabelle.':'');
+}
+function renderHpRows(){
+  var h=C.heatpump, t=h._test, rows={}; if(t&&t.rows) t.rows.forEach(function(x){rows[x.key]=x;});
+  var grp='', html='';
+  h.registers.forEach(function(r){
+    if(r.group!==grp){ grp=r.group; html+='<tr class="grp"><td colspan="8">'+esc(grp)+'</td></tr>'; }
+    var d=HPD.filter(function(x){return x.key===r.key;})[0]||{}, x=rows[r.key], custom=(r.doc!==d.doc||r.type!==d.type||+r.scale!==+d.scale||r.on!==d.on);
+    var tv=!x?'':x.error?'<span class="err">'+esc(x.error)+'</span>':x.value===null?'<span class="err">aus</span>':'<span class="val">'+nf(x.value,3)+' '+esc(r.unit)+'</span>';
+    var fc=+r.doc>=30001&&+r.doc<=39999?'Input (04)':'Holding (03)';
+    html+='<tr data-key="'+esc(r.key)+'"'+(custom?' class="custom"':'')+'><td>'+esc(r.label)+(r.writable?' <b>(wird geschrieben)</b>':'')+(r.verified?'':' <span class="hint" style="display:inline">ungeprüft</span>')+'</td>'+
+      '<td><input type="checkbox" data-f="on"'+(r.on?' checked':'')+(r.writable?' disabled':'')+' aria-label="Register '+esc(r.label)+' abfragen"></td>'+
+      '<td><input type="number" min="0" max="65535" data-f="doc" value="'+esc(r.doc)+'" aria-label="Doku-Nr. '+esc(r.label)+'"></td><td class="fc">'+fc+'</td>'+
+      '<td><select data-f="type" aria-label="Format '+esc(r.label)+'"><option value="s16"'+(r.type==='s16'?' selected':'')+'>s16</option><option value="u16"'+(r.type==='u16'?' selected':'')+'>u16</option></select></td>'+
+      '<td><input type="number" class="sc" min="0.0001" max="1000" step="any" data-f="scale" value="'+esc(r.scale)+'" aria-label="Faktor '+esc(r.label)+'"></td><td>'+esc(r.unit)+'</td><td>'+tv+'</td></tr>';
+  });
+  $('hpRows').innerHTML=html;
+  Array.prototype.forEach.call($('hpRows').querySelectorAll('[data-f]'),function(f){
+    var tr=f.closest('tr'), key=tr.getAttribute('data-key'), r=h.registers.filter(function(x){return x.key===key;})[0];
+    var upd=function(){ var k=f.getAttribute('data-f'); if(k==='on') r.on=f.checked; else if(k==='doc'){ r.doc=f.value===''?'':Number(f.value); var ok=(r.doc>=30001&&r.doc<=39999)||(r.doc>=40001&&r.doc<=49999); f.classList.toggle('bad',!ok); tr.querySelector('.fc').textContent=r.doc>=30001&&r.doc<=39999?'Input (04)':'Holding (03)'; } else if(k==='scale') r.scale=f.value===''?'':Number(f.value); else r.type=f.value;
+      var d=HPD.filter(function(x){return x.key===key;})[0]||{}; tr.className=(r.doc!==d.doc||r.type!==d.type||+r.scale!==+d.scale||r.on!==d.on)?'custom':''; changed(); };
+    f.onchange=upd; if(f.type==='number') f.oninput=upd;
+  });
+}
+
+/* ---------- Strompreis ---------- */
+function renderPrices(){
+  var p=C.prices;
+  Array.prototype.forEach.call($('prSource').querySelectorAll('button'),function(b){ b.setAttribute('aria-pressed',String(p.exchange===b.getAttribute('data-v'))); b.onclick=function(){ p.exchange=b.getAttribute('data-v'); renderPrices(); changed(); }; });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-pr]'),function(el){ var k=el.getAttribute('data-pr'); el.hidden = k==='dyn'?p.exchange==='none' : k==='fix'?false : p.exchange!=='energycharts'; });
+  document.querySelector('[data-pr="fix"] span').textContent = p.exchange==='none'?'Fester Arbeitspreis brutto, ct/kWh':'Ersatzpreis brutto, ct/kWh';
+  bindVal('prFixed',p,'fixedCt',true); bindVal('prVat',p,'vatPercent',true); bindVal('prFallback',p,'fallbackCt',true); bindVal('prFeed',p,'feedInCt',true); bindVal('prZone',p,'zone'); bindVal('prUrl',p,'url');
+  $('testPr').onclick=function(){ var b=this; b.disabled=true; $('rPr').textContent='frage die Börse ab …';
+    api('test-prices',{prices:p}).then(function(j){ $('rPr').innerHTML=j.ok?(j.fixed?'<span class="ok">Fester Preis '+nf(j.now.buy,2)+' ct/kWh.</span>':'<span class="ok">'+j.slots+' Viertelstunden erhalten, bekannt bis '+new Date(j.knownUntil).toLocaleString('de-DE',{weekday:'short',hour:'2-digit',minute:'2-digit'})+'. Jetzt: Börse '+nf(j.now.spot,2)+' ct, dein Preis '+nf(j.now.buy,2)+' ct/kWh.'+(j.hasTomorrow?' Die Preise für morgen sind da.':' Die Preise für morgen kommen gegen 13 Uhr.')+'</span>'):'<span class="bad">'+esc(j.error)+'</span>'; }).catch(function(e){ $('rPr').innerHTML='<span class="bad">'+esc(e.message)+'</span>'; }).then(function(){ b.disabled=false; }); };
+}
+
+/* ---------- Prognose ---------- */
+function renderForecast(){
+  var f=C.forecast;
+  bindVal('fcLat',f,'lat',true); bindVal('fcLon',f,'lon',true); bindVal('fcPr',f,'performanceRatio',true); bindVal('fcUrlW',f,'urlWeather'); bindVal('fcUrlS',f,'urlSolar');
+  $('fcProv').value=f.provider; $('fcProv').onchange=function(){ f.provider=this.value; changed(); };
+  var box=$('planes'); box.innerHTML='';
+  if(!f.planes.length) box.innerHTML='<p class="hint">Noch keine Dachfläche. Ohne Dachfläche gibt es keine PV-Prognose, nur Wetter.</p>';
+  f.planes.forEach(function(pl,idx){
+    var el=document.createElement('div'); el.className='plane';
+    el.innerHTML='<label class="f"><span>Bezeichnung</span><input type="text" maxlength="30" data-k="name" value="'+esc(pl.name)+'" placeholder="z. B. Süddach"></label>'+
+      '<label class="f"><span>Leistung, kWp</span><input type="number" min="0.1" max="200" step="0.01" data-k="kwp" value="'+esc(pl.kwp)+'"></label>'+
+      '<label class="f"><span>Ausrichtung, °</span><input type="number" min="-180" max="180" data-k="azimuth" value="'+esc(pl.azimuth)+'"><small>0 Süd, −90 Ost, 90 West</small></label>'+
+      '<label class="f"><span>Neigung, °</span><input type="number" min="0" max="90" data-k="tilt" value="'+esc(pl.tilt)+'"><small>0 flach, 90 senkrecht</small></label>'+
+      '<button class="b danger" type="button">Entfernen</button>';
+    box.appendChild(el);
+    Array.prototype.forEach.call(el.querySelectorAll('[data-k]'),function(i){ i.oninput=function(){ var k=i.getAttribute('data-k'); pl[k]=i.type==='number'?(i.value===''?'':Number(i.value)):i.value; changed(); }; });
+    el.querySelector('button').onclick=function(){ f.planes.splice(idx,1); renderForecast(); changed(); };
+  });
+  $('addPlane').onclick=function(){ f.planes.push({name:'',kwp:'',azimuth:0,tilt:30}); renderForecast(); changed(); };
+  $('testFc').onclick=function(){ var b=this; b.disabled=true; $('rFc').textContent='rufe Wetter und Prognose ab …';
+    api('test-forecast',{forecast:payload().forecast}).then(function(j){ $('rFc').innerHTML=j.ok?'<span class="ok">Erhalten. Jetzt '+nf(j.tempNow,1)+' °C, PV heute '+nf(j.todayKwh,1)+' kWh, morgen '+nf(j.tomorrowKwh,1)+' kWh (noch ohne Lernfaktor).</span>':'<span class="bad">'+esc(j.error)+'</span>'; }).catch(function(e){ $('rFc').innerHTML='<span class="bad">'+esc(e.message)+'</span>'; }).then(function(){ b.disabled=false; }); };
+}
+
+/* ---------- Planer ---------- */
+function renderPlanner(){
+  var p=C.planner;
+  Array.prototype.forEach.call($('plMode').querySelectorAll('button'),function(b){ b.setAttribute('aria-pressed',String(p.mode===b.getAttribute('data-v'))); b.onclick=function(){ p.mode=b.getAttribute('data-v'); renderPlanner(); changed(); }; });
+  bindVal('plCap',p,'capacityKwh',true); bindVal('plMin',p,'minSoc',true); bindVal('plMax',p,'maxSoc',true); bindVal('plCh',p,'chargeW',true); bindVal('plDis',p,'dischargeW',true); bindVal('plPv',p,'pvChargeW',true);
+  bindVal('plEff',p,'efficiency',true); bindVal('plMargin',p,'marginCt',true); bindVal('plHor',p,'horizonHours',true); bindVal('plBase',p,'baseLoadW',true); bindVal('plTick',p,'tickSeconds',true);
+  var h=p.heat; $('plHeat').checked=h.enabled; $('plHeat').onchange=function(){ h.enabled=this.checked; changed(); };
+  bindVal('plLimit',h,'limitTemp',true); bindVal('plWpk',h,'wattsPerKelvin',true); bindVal('plKpk',h,'kwPerShiftK',true); bindVal('plStore',h,'storeHours',true); bindVal('plUp',h,'shiftUp',true); bindVal('plDown',h,'shiftDown',true); bindVal('plSur',h,'surplusW',true); bindVal('plCheap',h,'cheapPct',true); bindVal('plExp',h,'expensivePct',true);
 }
 
 function renderInvs(){

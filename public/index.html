@@ -55,7 +55,7 @@ h2{font-size:20px;font-weight:600;margin:0 0 12px}
 .tower-head dl{margin:0;display:grid;grid-template-columns:auto auto;gap:0 12px;text-align:right}
 .tower-head dt{color:var(--muted)}
 .tower-head dd{margin:0;font-weight:500}
-.tower{border:2px solid var(--ink)}
+.tower{border:2px solid var(--ink);border-radius:0 0 10px 10px;overflow:hidden} .tower-head{border-radius:10px 10px 0 0}
 .mod{display:grid;grid-template-columns:96px 1fr;border-bottom:1px solid var(--line)}
 .mod:last-child{border-bottom:0}
 .mod .name{padding:8px 6px 8px 12px;font-weight:600;white-space:nowrap;border-right:1px solid var(--line)}
@@ -151,10 +151,12 @@ td:last-child,th:last-child{padding-right:0}
 @media (max-width:1100px){.layout{grid-template-columns:1fr}.charts,.three{grid-template-columns:1fr}}
 @media (max-width:520px){.wrap{padding:14px 12px 36px}.soc{font-size:46px}.mod,.axis{grid-template-columns:84px 1fr}}
 </style>
+<link rel="stylesheet" href="/skins.css">
+<script src="/skins.js"></script>
 </head>
 <body>
 <div class="wrap">
-  <nav class="top" aria-label="Bereiche"><a href="/" aria-current="page">Monitor</a><a href="/einstellungen">Einstellungen</a><a href="/matching" id="navM">Matching</a><a href="/anlage">Anlage</a><span class="copy">(C) by Elric M.</span></nav>
+  <nav class="top" aria-label="Bereiche"><a href="/" aria-current="page">Monitor</a><a href="/einstellungen">Einstellungen</a><a href="/matching" id="navM">Matching</a><a href="/planer">Planer</a><a href="/anlage">Anlage</a><span class="copy">(C) by Elric M.</span></nav>
   <header>
     <h1 id="plant">Sungrow Monitor</h1>
     <div class="state"><span class="dot" id="dot"></span><b id="sysState">verbinde …</b> <span id="emsState"></span></div>

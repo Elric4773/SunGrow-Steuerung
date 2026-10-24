@@ -17,9 +17,12 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const R = require('./registers');
+const HP = require('./heatpump');
+const PL = require('./planner');
+const MT = require('./meters');
 
 module.exports = function (ctx) {
-const ROOT = ctx.root, CONFIG = path.join(ROOT, 'config.json');
+const ROOT = ctx.root, CONFIG = ctx.configFile || path.join(ROOT, 'config.json');
 const COOKIE = 'sg_anlage';
 let failures = 0, blockedUntil = 0;
 
@@ -80,11 +83,31 @@ function publicConfig() {
     cellSource: c.winet.enabled ? 'winet' : c.battery.enabled ? 'modbus' : 'off',
     winet: { host: c.winet.host || '', port: c.winet.port, username: c.winet.username || '', passwordSet: !!c.winet.password,
       intervalSeconds: c.winet.intervalSeconds, paramAddress: c.winet.paramAddress, paramCount: c.winet.paramCount },
-    modbusBattery: { unitId: c.battery.unitId, cellBlockAddress: c.battery.cellBlockAddress },
+    modbusBattery: { host: c.battery.host || '', port: c.battery.port || 502, unitId: c.battery.unitId, cellBlockAddress: c.battery.cellBlockAddress },
     moduleCount: c.moduleCount, topModuleIndex: c.topModuleIndex, moduleNotes: c.moduleNotes || {},
-    targetModule: (c.matching && c.matching.targetModule) || c.moduleCount
+    targetModule: (c.matching && c.matching.targetModule) || c.moduleCount,
+    meters: (Array.isArray(c.meters) ? c.meters : []).map(function (m) { return Object.assign({}, m, { password: undefined, passwordSet: !!m.password }); }),
+    heatpump: heatpumpPublic(c.heatpump || {}),
+    prices: Object.assign({ exchange: 'none', fixedCt: 18, vatPercent: 19, feedInCt: 8, fallbackCt: 30, zone: 'DE-LU', url: '' }, c.prices || {}),
+    forecast: { provider: (c.forecast && c.forecast.provider) || 'openmeteo', lat: c.forecast && c.forecast.lat !== null ? c.forecast.lat : '', lon: c.forecast && c.forecast.lon !== null ? c.forecast.lon : '',
+      planes: (c.forecast && Array.isArray(c.forecast.planes) ? c.forecast.planes : []).map(function (p) { return { name: p.name || '', kwp: p.kwp, azimuth: p.azimuth, tilt: p.tilt }; }),
+      performanceRatio: (c.forecast && c.forecast.performanceRatio) || 0.85, urlWeather: (c.forecast && c.forecast.urlWeather) || '', urlSolar: (c.forecast && c.forecast.urlSolar) || '' },
+    planner: plannerPublic(c.planner || {})
   };
 }
+function heatpumpPublic(h) {
+  const map = HP.mapFor(h);
+  return { enabled: !!h.enabled, name: h.name || 'Wärmepumpe', model: h.model || 'weishaupt', host: h.host || '', port: h.port || 502, unitId: h.unitId === undefined ? 1 : h.unitId,
+    framing: h.framing === 'tcp' ? 'tcp' : 'rtu', pollSeconds: h.pollSeconds || 30, writeEnabled: !!h.writeEnabled, shift: { min: h.shift && typeof h.shift.min === 'number' ? h.shift.min : -3, max: h.shift && typeof h.shift.max === 'number' ? h.shift.max : 5 },
+    registers: map.map(function (e) { return { key: e.key, group: e.group, label: e.label, doc: e.doc, fc: e.fc, addr: e.addr, type: e.type, scale: e.scale, unit: e.unit, on: e.on, writable: e.writable, verified: e.verified, custom: e.custom }; }) };
+}
+function plannerPublic(p) {
+  const d = PL.DEFAULTS, out = {};
+  Object.keys(d).forEach(function (k) { if (k !== 'heat') out[k] = p[k] === undefined ? d[k] : p[k]; });
+  out.heat = Object.assign({}, d.heat, p.heat || {});
+  return out;
+}
+function heatpumpDefaults() { return HP.mapFor({}); }
 function typeInfo() {
   const out = {};
   Object.keys(R.TYPES).forEach(function (k) { out[k] = { label: R.TYPES[k].label, map: R.TYPES[k].map.map(function (e) { return { key: e.key, group: e.group, label: e.label, fc: e.fc, addr: e.addr, type: e.type, scale: e.scale, unit: e.unit, core: !!e.core }; }) }; });
@@ -140,15 +163,132 @@ function validate(body) {
     if (winet.paramAddress === null || winet.paramCount === null) err.push('WiNet-S: Zellblock-Adresse 0 bis 65535, Anzahl 24 bis 60');
   }
   const mb = b.modbusBattery || {};
-  const modbusBattery = { unitId: int(mb.unitId, 0, 247), cellBlockAddress: int(mb.cellBlockAddress, 0, 65535) };
-  if (src === 'modbus' && (modbusBattery.unitId === null || modbusBattery.cellBlockAddress === null)) err.push('Batterie über Modbus: Geräteadresse und Zellblock-Adresse prüfen');
+  const modbusBattery = { host: mb.host ? cleanHost(mb.host) : null, port: int(mb.port, 1, 65535), unitId: int(mb.unitId, 0, 247), cellBlockAddress: int(mb.cellBlockAddress, 0, 65535) };
+  if (mb.host && !modbusBattery.host) err.push('Batterie über Modbus: Adresse ungültig');
+  if (src === 'modbus' && (modbusBattery.unitId === null || modbusBattery.cellBlockAddress === null || modbusBattery.port === null)) err.push('Batterie über Modbus: Adresse, Port, Geräteadresse und Zellblock-Adresse prüfen');
   const moduleCount = int(b.moduleCount, 1, MAX_MODULES); if (moduleCount === null) err.push('Anzahl der Module: 1 bis ' + MAX_MODULES);
   const top = int(b.topModuleIndex, 1, MAX_MODULES); if (top === null || (moduleCount && top > moduleCount)) err.push('Oberstes Modul: 1 bis Anzahl der Module');
   const target = int(b.targetModule, 1, MAX_MODULES); if (target === null || (moduleCount && target > moduleCount)) err.push('Nachgerüstetes Modul: 1 bis Anzahl der Module');
   const notes = {};
   Object.keys(b.moduleNotes || {}).forEach(function (k) { const n = int(k, 1, MAX_MODULES), t = String(b.moduleNotes[k] || '').trim().slice(0, 40); if (n && t && (!moduleCount || n <= moduleCount)) notes[n] = t; });
+  const mtv = validateMeters(b.meters || [], err), hpv = validateHeatpump(b.heatpump || {}, err), prv = validatePrices(b.prices || {}, err), fcv = validateForecast(b.forecast || {}, err), plv = validatePlanner(b.planner || {}, err);
+  if (plv.heat.enabled && !hpv.enabled) err.push('Planer: die Wärmepumpe soll geplant werden, ist aber nicht aktiv.');
+  if (plv.mode === 'active' && plv.heat.enabled && !hpv.writeEnabled) err.push('Planer: im aktiven Modus mit Wärmepumpe muss bei der Wärmepumpe „Schreiben erlauben“ gesetzt sein.');
   return { errors: err, value: { plantName: plantName, httpPort: httpPort, pollSeconds: pollSeconds, inverters: invs, cellSource: src, winet: winet, modbusBattery: modbusBattery,
-    moduleCount: moduleCount, topModuleIndex: top, targetModule: target, moduleNotes: notes } };
+    moduleCount: moduleCount, topModuleIndex: top, targetModule: target, moduleNotes: notes, meters: mtv, heatpump: hpv, prices: prv, forecast: fcv, planner: plv } };
+}
+function validateMeters(list, err) {
+  const out = [], names = {};
+  (Array.isArray(list) ? list : []).slice(0, 12).forEach(function (m, n) {
+    const tag = 'Messgerät ' + (n + 1), name = String(m.name || '').trim().slice(0, 40);
+    if (!name) { err.push(tag + ': Name fehlt'); return; }
+    if (names[name.toLowerCase()]) err.push(tag + ': Name „' + name + '“ ist doppelt'); names[name.toLowerCase()] = true;
+    const o = { name: name, enabled: m.enabled !== false, role: MT.ROLES[m.role] ? m.role : 'custom', source: ['modbus', 'loxone', 'http'].indexOf(m.source) >= 0 ? m.source : 'modbus',
+      pollSeconds: int(m.pollSeconds, 5, 600) || 10, scale: num(m.scale, -1000000, 1000000), invert: !!m.invert };
+    if (o.scale === null || o.scale === 0) o.scale = 1;
+    if (o.source === 'modbus') {
+      o.host = cleanHost(m.host); if (!o.host) err.push(name + ': IP-Adresse fehlt oder ist ungültig');
+      o.port = int(m.port, 1, 65535) || 502; o.unitId = int(m.unitId, 0, 247); if (o.unitId === null) o.unitId = 1;
+      o.framing = m.framing === 'tcp' ? 'tcp' : 'rtu'; o.template = String(m.template || 'generic').slice(0, 20);
+      const fa = MT.fromDocNo(m.doc); if (!fa) err.push(name + ': Doku-Nr. 30001–39999 (Input) oder 40001–49999 (Holding)'); else { o.fc = fa.fc; o.addr = fa.addr; o.doc = Number(m.doc); }
+      o.type = MT.TYPES.indexOf(m.type) >= 0 ? m.type : 'u16';
+    } else if (o.source === 'loxone') {
+      o.host = cleanHost(m.host); if (!o.host) err.push(name + ': Adresse des Miniservers fehlt oder ist ungültig');
+      o.port = int(m.port, 1, 65535) || 80; o.username = String(m.username || '').trim().slice(0, 64); o.password = typeof m.password === 'string' ? m.password : '';
+      o.object = String(m.object || '').trim().slice(0, 80); if (!o.object) err.push(name + ': Objektname aus Loxone Config fehlt');
+      if (!o.username) err.push(name + ': Benutzer für den Miniserver fehlt');
+    } else {
+      o.url = String(m.url || '').trim().slice(0, 300); if (!/^https?:\/\//.test(o.url)) err.push(name + ': Adresse muss mit http:// oder https:// beginnen');
+      o.path = String(m.path || '').trim().slice(0, 120); o.username = String(m.username || '').trim().slice(0, 64); o.password = typeof m.password === 'string' ? m.password : '';
+    }
+    out.push(o);
+  });
+  return out;
+}
+function num(v, lo, hi) { const n = Number(v); return typeof v !== 'boolean' && v !== '' && v !== null && v !== undefined && !isNaN(n) && n >= lo && n <= hi ? n : null; }
+function validateHeatpump(h, err) {
+  const out = { enabled: !!h.enabled, name: String(h.name || '').trim().slice(0, 40) || 'Wärmepumpe', model: 'weishaupt', host: '', port: 502, unitId: 1, framing: h.framing === 'tcp' ? 'tcp' : 'rtu',
+    pollSeconds: 30, writeEnabled: !!h.writeEnabled, shift: { min: -3, max: 5 }, registers: {} };
+  const tag = 'Wärmepumpe';
+  if (out.enabled) {
+    const host = cleanHost(h.host); if (!host) err.push(tag + ': IP-Adresse oder Hostname des Umsetzers fehlt oder ist ungültig'); out.host = host || '';
+    const port = int(h.port, 1, 65535); if (port === null) err.push(tag + ': Port 1 bis 65535'); out.port = port || 502;
+    const unit = int(h.unitId, 0, 247); if (unit === null) err.push(tag + ': Geräteadresse 0 bis 247'); out.unitId = unit === null ? 1 : unit;
+    const ps = int(h.pollSeconds, 5, 600); if (ps === null) err.push(tag + ': Abfrage alle 5 bis 600 Sekunden'); out.pollSeconds = ps || 30;
+  } else { out.host = cleanHost(h.host) || ''; out.port = int(h.port, 1, 65535) || 502; out.unitId = int(h.unitId, 0, 247); if (out.unitId === null) out.unitId = 1; out.pollSeconds = int(h.pollSeconds, 5, 600) || 30; }
+  const sh = h.shift || {};
+  const mn = num(sh.min, -10, 0), mx = num(sh.max, 0, 15);
+  if (mn === null || mx === null) err.push(tag + ': Verschiebung mindestens −10 bis 0 K, höchstens 0 bis 15 K'); else { out.shift.min = mn; out.shift.max = mx; }
+  const defs = heatpumpDefaults(), regs = Array.isArray(h.registers) ? h.registers : [];
+  defs.forEach(function (d) {
+    const rI = regs.filter(function (x) { return x && x.key === d.key; })[0]; if (!rI) return;
+    const o = {};
+    if (rI.doc !== undefined && rI.doc !== '') { const fa = HP.fromDocNo(rI.doc); if (!fa) err.push(tag + ': Register „' + d.label + '“ braucht eine Doku-Nr. 30001–39999 (Input) oder 40001–49999 (Holding)'); else { o.fc = fa.fc; o.addr = fa.addr; } }
+    if (rI.type === 'u16' || rI.type === 's16') o.type = rI.type;
+    const sc = num(rI.scale, 0.0001, 1000); if (rI.scale !== undefined && rI.scale !== '') { if (sc === null) err.push(tag + ': Faktor bei „' + d.label + '“ ungültig'); else o.scale = sc; }
+    if (typeof rI.on === 'boolean') o.on = rI.on;
+    if (d.writable && o.on === false) o.on = true;        // die Verschiebung bleibt immer in der Karte
+    const diff = {};
+    if (o.fc !== undefined && (o.fc !== d.fc || o.addr !== d.addr)) { diff.fc = o.fc; diff.addr = o.addr; }
+    if (o.type !== undefined && o.type !== d.type) diff.type = o.type;
+    if (o.scale !== undefined && o.scale !== d.scale) diff.scale = o.scale;
+    if (o.on !== undefined && o.on !== d.on) diff.on = o.on;
+    if (Object.keys(diff).length) out.registers[d.key] = diff;
+  });
+  return out;
+}
+function validatePrices(p, err) {
+  const out = { exchange: ['awattar', 'energycharts', 'none'].indexOf(p.exchange) >= 0 ? p.exchange : 'none', zone: String(p.zone || 'DE-LU').trim().slice(0, 10), url: String(p.url || '').trim().slice(0, 300) };
+  const f = function (k, lo, hi, label, def) { const v = num(p[k], lo, hi); if (v === null) { if (p[k] === '' || p[k] === undefined) return def; err.push('Strompreis: ' + label); return def; } return v; };
+  out.fixedCt = f('fixedCt', 0, 100, 'feste Bestandteile 0 bis 100 ct/kWh', 18);
+  out.vatPercent = f('vatPercent', 0, 30, 'Mehrwertsteuer 0 bis 30 %', 19);
+  out.feedInCt = f('feedInCt', 0, 100, 'Einspeisevergütung 0 bis 100 ct/kWh', 8);
+  out.fallbackCt = f('fallbackCt', 0, 200, 'Ersatzpreis 0 bis 200 ct/kWh', 30);
+  if (out.url && !/^https?:\/\//.test(out.url)) err.push('Strompreis: die Adresse der Schnittstelle muss mit http:// oder https:// beginnen');
+  return out;
+}
+function validateForecast(fv, err) {
+  const out = { provider: fv.provider === 'forecastsolar' ? 'forecastsolar' : 'openmeteo', lat: num(fv.lat, -90, 90), lon: num(fv.lon, -180, 180), planes: [], performanceRatio: num(fv.performanceRatio, 0.3, 1.2), urlWeather: String(fv.urlWeather || '').trim().slice(0, 300), urlSolar: String(fv.urlSolar || '').trim().slice(0, 300) };
+  if (out.performanceRatio === null) out.performanceRatio = 0.85;
+  const planes = Array.isArray(fv.planes) ? fv.planes.slice(0, 6) : [];
+  planes.forEach(function (pl, i) {
+    const tag = 'Prognose, Dachfläche ' + (i + 1);
+    const kwp = num(pl.kwp, 0.1, 200), az = num(pl.azimuth, -180, 180), tilt = num(pl.tilt, 0, 90);
+    if (kwp === null) err.push(tag + ': Leistung 0,1 bis 200 kWp'); if (az === null) err.push(tag + ': Ausrichtung −180 bis 180° (0 = Süd, −90 = Ost, 90 = West)'); if (tilt === null) err.push(tag + ': Neigung 0 bis 90°');
+    out.planes.push({ name: String(pl.name || '').trim().slice(0, 30), kwp: kwp || 1, azimuth: az || 0, tilt: tilt === null ? 30 : tilt });
+  });
+  if (planes.length && (out.lat === null || out.lon === null)) err.push('Prognose: Breiten- und Längengrad des Standorts fehlen (Dezimalgrad, z. B. 50.11 und 8.68)');
+  [out.urlWeather, out.urlSolar].forEach(function (u) { if (u && !/^https?:\/\//.test(u)) err.push('Prognose: Adressen der Schnittstellen müssen mit http:// oder https:// beginnen'); });
+  return out;
+}
+function validatePlanner(p, err) {
+  const d = PL.DEFAULTS, out = {};
+  out.mode = ['off', 'simulate', 'active'].indexOf(p.mode) >= 0 ? p.mode : 'off';
+  const f = function (o, src, k, lo, hi, label, def) { const v = num(src[k], lo, hi); if (v === null) { if (src[k] === '' || src[k] === undefined) { o[k] = def; return; } err.push('Planer: ' + label); o[k] = def; } else o[k] = v; };
+  f(out, p, 'horizonHours', 12, 72, 'Planungshorizont 12 bis 72 Stunden', d.horizonHours);
+  f(out, p, 'capacityKwh', 0, 500, 'Kapazität 0 (= vom Wechselrichter) bis 500 kWh', d.capacityKwh);
+  f(out, p, 'minSoc', 0, 90, 'untere Ladegrenze 0 bis 90 %', d.minSoc);
+  f(out, p, 'maxSoc', 20, 100, 'obere Ladegrenze 20 bis 100 %', d.maxSoc);
+  f(out, p, 'chargeW', 100, 50000, 'Netzladeleistung 100 bis 50000 W', d.chargeW);
+  f(out, p, 'dischargeW', 100, 50000, 'Entladeleistung 100 bis 50000 W', d.dischargeW);
+  f(out, p, 'pvChargeW', 100, 50000, 'PV-Ladeleistung 100 bis 50000 W', d.pvChargeW);
+  f(out, p, 'efficiency', 0.5, 1, 'Wirkungsgrad 0,5 bis 1', d.efficiency);
+  f(out, p, 'marginCt', 0, 30, 'Mindestvorteil 0 bis 30 ct/kWh', d.marginCt);
+  f(out, p, 'baseLoadW', 0, 20000, 'Grundlast 0 bis 20000 W', d.baseLoadW);
+  f(out, p, 'tickSeconds', 10, 600, 'Takt 10 bis 600 Sekunden', d.tickSeconds);
+  if (out.minSoc >= out.maxSoc) err.push('Planer: die untere Ladegrenze muss unter der oberen liegen');
+  const h = p.heat || {}, oh = {}; out.heat = oh;
+  oh.enabled = !!h.enabled;
+  f(oh, h, 'limitTemp', -5, 25, 'Heizgrenze −5 bis 25 °C', d.heat.limitTemp);
+  f(oh, h, 'wattsPerKelvin', 10, 2000, 'Leistung je Kelvin 10 bis 2000 W', d.heat.wattsPerKelvin);
+  f(oh, h, 'kwPerShiftK', 0.01, 5, 'Mehrleistung je Kelvin Verschiebung 0,01 bis 5 kW', d.heat.kwPerShiftK);
+  f(oh, h, 'storeHours', 0.5, 12, 'Speicherdauer 0,5 bis 12 Stunden', d.heat.storeHours);
+  f(oh, h, 'shiftUp', 0, 15, 'Anhebung 0 bis 15 K', d.heat.shiftUp);
+  f(oh, h, 'shiftDown', -10, 0, 'Absenkung −10 bis 0 K', d.heat.shiftDown);
+  f(oh, h, 'surplusW', 0, 30000, 'Überschuss-Schwelle 0 bis 30000 W', d.heat.surplusW);
+  f(oh, h, 'cheapPct', 5, 50, 'Anteil billige Stunden 5 bis 50 %', d.heat.cheapPct);
+  f(oh, h, 'expensivePct', 5, 50, 'Anteil teure Stunden 5 bis 50 %', d.heat.expensivePct);
+  return out;
 }
 
 function save(v) {
@@ -166,11 +306,22 @@ function save(v) {
     paramAddress: v.winet.paramAddress === null ? 10756 : v.winet.paramAddress, paramCount: v.winet.paramCount || 30
   });
   ['devId', 'devType', 'devCode'].forEach(function (k) { if (v.winet.host !== (old.host || null)) delete c.winet[k]; });
-  c.battery = Object.assign({}, c.battery, { enabled: v.cellSource === 'modbus', unitId: v.modbusBattery.unitId === null ? 200 : v.modbusBattery.unitId,
+  c.battery = Object.assign({}, c.battery, { enabled: v.cellSource === 'modbus', host: v.modbusBattery.host, port: v.modbusBattery.port || 502, unitId: v.modbusBattery.unitId === null ? 200 : v.modbusBattery.unitId,
     cellBlockAddress: v.modbusBattery.cellBlockAddress === null ? 10756 : v.modbusBattery.cellBlockAddress });
   c.moduleCount = v.moduleCount; c.topModuleIndex = v.topModuleIndex; c.moduleNotes = v.moduleNotes;
   c.matching = Object.assign({}, c.matching, { targetModule: v.targetModule });
+  // Passwörter der Messgeräte: leeres Feld behält das gespeicherte
+  const oldM = Array.isArray(c.meters) ? c.meters : [];
+  v.meters.forEach(function (m) { if (m.password === '' ) { const o = oldM.filter(function (x) { return x.name === m.name; })[0]; if (o && o.password) m.password = o.password; } });
+  c.meters = v.meters; c.heatpump = v.heatpump; c.prices = v.prices; c.forecast = v.forecast; c.planner = v.planner;
   writeFileConfig(c);
+}
+/* Betriebsart des Planers von der Seite Planer aus umschalten, ohne Neustart */
+function setPlannerMode(mode) {
+  const c = readFileConfig();
+  c.planner = Object.assign({}, c.planner, { mode: mode });
+  writeFileConfig(c);
+  if (ctx.cfg.planner) ctx.cfg.planner.mode = mode;
 }
 
 /* ---------------------------------------------------------------- HTTP */
@@ -218,7 +369,7 @@ function handle(req, res, url) {
 
   if (!loggedIn(req)) { sendJson(res, 401, { error: 'Nicht angemeldet.' }); return true; }
 
-  if (what === 'config') { sendJson(res, 200, { config: publicConfig(), types: typeInfo(), maxModules: MAX_MODULES }); return true; }
+  if (what === 'config') { sendJson(res, 200, { config: publicConfig(), types: typeInfo(), maxModules: MAX_MODULES, meterTemplates: MT.TEMPLATES, meterRoles: MT.ROLES, meterTypes: MT.TYPES, heatpumpTypes: Object.keys(HP.TYPES).map(function (k) { return { id: k, label: HP.TYPES[k].label }; }), heatpumpDefaults: heatpumpDefaults().map(function (e) { return { key: e.key, doc: e.doc, type: e.type, scale: e.scale, on: e.on }; }), plannerDefaults: PL.DEFAULTS }); return true; }
 
   if (what === 'test' && post) {
     readBody(req, 50000, function (j) {
@@ -241,6 +392,42 @@ function handle(req, res, url) {
     });
     return true;
   }
+  if (what === 'test-meter' && post) {
+    readBody(req, 10000, function (j) {
+      const e2 = [], l = validateMeters([Object.assign({}, j.meter || {}, { name: (j.meter && j.meter.name) || 'Test' })], e2);
+      if (e2.length) return sendJson(res, 200, { ok: false, error: e2.join('; ') });
+      const m = l[0];
+      if (m.password === '') { const o = (Array.isArray(ctx.cfg.meters) ? ctx.cfg.meters : []).filter(function (x) { return x.name === m.name; })[0]; if (o && o.password) m.password = o.password; }
+      MT.test(m, ctx.cfg.timeoutMs).then(function (r) { sendJson(res, 200, r); }, function (e) { sendJson(res, 200, { ok: false, error: e.message }); });
+    });
+    return true;
+  }
+  if (what === 'test-heatpump' && post) {
+    readBody(req, 50000, function (j) {
+      const e2 = [], h = validateHeatpump(Object.assign({}, j.heatpump || {}, { enabled: true }), e2);
+      if (e2.length) return sendJson(res, 200, { ok: false, error: e2.join('; ') });
+      HP.test(h, ctx.cfg.timeoutMs).then(function (r) { sendJson(res, 200, r); }, function (e) { sendJson(res, 200, { ok: false, error: e.message }); });
+    });
+    return true;
+  }
+  if (what === 'test-prices' && post) {
+    readBody(req, 5000, function (j) {
+      const e2 = [], p = validatePrices(j.prices || {}, e2);
+      if (e2.length) return sendJson(res, 200, { ok: false, error: e2.join('; ') });
+      if (p.exchange === 'none') return sendJson(res, 200, { ok: true, fixed: true, now: { buy: (p.fallbackCt) } });
+      require('./prices').test(p).then(function (r) { sendJson(res, 200, r); }, function (e) { sendJson(res, 200, { ok: false, error: e.message }); });
+    });
+    return true;
+  }
+  if (what === 'test-forecast' && post) {
+    readBody(req, 10000, function (j) {
+      const e2 = [], f = validateForecast(j.forecast || {}, e2);
+      if (e2.length) return sendJson(res, 200, { ok: false, error: e2.join('; ') });
+      if (f.lat === null || f.lon === null) return sendJson(res, 200, { ok: false, error: 'Breiten- und Längengrad eintragen.' });
+      require('./forecast').test(f).then(function (r) { sendJson(res, 200, r); }, function (e) { sendJson(res, 200, { ok: false, error: e.message }); });
+    });
+    return true;
+  }
   if (what === 'save' && post) {
     readBody(req, 100000, function (j) {
       if (ctx.busy && ctx.busy()) return sendJson(res, 200, { ok: false, errors: ['Während eines Matching-Ablaufs wird nicht gespeichert. Bitte den Ablauf erst beenden oder abbrechen.'] });
@@ -257,5 +444,5 @@ function handle(req, res, url) {
   return true;
 }
 
-return { handle: handle };
+return { handle: handle, setPlannerMode: setPlannerMode };
 };

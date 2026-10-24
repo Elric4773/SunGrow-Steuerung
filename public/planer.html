@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<!--
+  Sungrow Steuerung – (C) by Elric M.
+  Nur für die private Nutzung zu Test- und Lernzwecken. Kommerzielle Verwendung, Verwendung im Geschäftsbetrieb und
+  Weiterverkauf untersagt. Benutzung auf eigene Gefahr, ohne Gewährleistung oder Garantie. Siehe LICENSE und HANDBUCH.md.
+-->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#E7EAED;--panel:#F8F9FA;--ink:#17202A;--muted:#5A6673;--line:#C9D0D7;--track:#DDE2E7;--pv:#B9861A;--grid:#3B6FD9;--batt:#1E9A82;--alert:#C2352B;--heat:#7F5FCC;--bar:#A7B3BF;--pvfill:rgba(185,134,26,.2);--night:rgba(23,32,42,.05);--p1:#DCE2E8;--p2:#C3CCD5;--p3:#A7B3BF;--p4:#8794A3;--p5:#67768A}
+@media (prefers-color-scheme:dark){:root{--bg:#141A21;--panel:#1C242D;--ink:#E6EAEE;--muted:#97A3AF;--line:#34404C;--track:#2A343F;--pv:#BD871A;--grid:#5E8EE0;--batt:#2FA893;--alert:#EF6A5F;--heat:#A47BD6;--bar:#3F4C5B;--pvfill:rgba(189,135,26,.2);--night:rgba(0,0,0,.22);--p1:#2A3440;--p2:#34404D;--p3:#3F4C5B;--p4:#4B5A6B;--p5:#5A6A7D}}
+*{box-sizing:border-box} html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Barlow Semi Condensed",Bahnschrift,"DIN Alternate","Arial Narrow",sans-serif;font-size:17px;line-height:1.35;font-variant-numeric:tabular-nums}
+.wrap{max-width:1400px;margin:0 auto;padding:20px 24px 60px}
+.top{display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid var(--ink);flex-wrap:wrap}
+.top a{font-size:18px;padding:8px 20px;border:2px solid var(--ink);border-bottom:0;color:var(--ink);text-decoration:none;margin-bottom:-2px}
+.top a[aria-current="page"]{background:var(--ink);color:var(--panel)}
+.top a:hover,.top a:focus-visible{background:var(--track)} .top a[aria-current="page"]:hover{background:var(--ink)}
+.top .copy{margin-left:auto;align-self:center;color:var(--muted);font-size:15px;white-space:nowrap;padding:0 2px 6px 16px}
+h1{font-size:30px;font-weight:600;margin:0} h2{font-size:21px;font-weight:600;margin:0} h3{font-size:17px;font-weight:600;margin:0}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 28px;margin-bottom:14px}
+header .state{display:flex;align-items:center;gap:10px;font-size:19px}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--muted);display:inline-block}
+.dot.sim{background:var(--pv)} .dot.on{background:var(--batt);box-shadow:0 0 0 4px rgba(10,133,117,.18)} .dot.off{background:var(--muted)}
+.seg{display:inline-flex;border:2px solid var(--ink);border-radius:999px;overflow:hidden;box-shadow:var(--shadow)} .seg button{font:inherit;font-size:16px;padding:6px 16px;border:0;background:none;color:var(--ink);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)} .seg button[disabled]{opacity:.4;cursor:default}
+header .acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+button.b{font:inherit;font-size:16px;padding:6px 16px;border:2px solid var(--ink);border-radius:999px;background:var(--panel);color:var(--ink);cursor:pointer;box-shadow:var(--shadow)} button.b[disabled]{opacity:.4;cursor:default}
+button:focus-visible,a:focus-visible{outline:3px solid var(--grid);outline-offset:2px}
+.banner{margin:0 0 14px;padding:12px 16px;border-left:5px solid var(--pv);background:var(--panel);border-radius:10px;box-shadow:var(--shadow)} .banner.bad{border-left-color:var(--alert)}
+:root{--shadow:0 1px 2px rgba(23,32,42,.06),0 10px 28px -8px rgba(23,32,42,.22),0 30px 60px -30px rgba(23,32,42,.25);--shadow-hi:0 2px 4px rgba(23,32,42,.08),0 18px 40px -10px rgba(23,32,42,.3),0 44px 80px -36px rgba(23,32,42,.3)}
+@media (prefers-color-scheme:dark){:root{--shadow:0 1px 2px rgba(0,0,0,.4),0 12px 30px -8px rgba(0,0,0,.6),0 30px 60px -30px rgba(0,0,0,.7);--shadow-hi:0 2px 4px rgba(0,0,0,.5),0 20px 44px -10px rgba(0,0,0,.7),0 50px 90px -36px rgba(0,0,0,.7)}}
+body{background:radial-gradient(1200px 600px at 20% -10%,rgba(201,138,0,.10),transparent 60%),radial-gradient(900px 500px at 100% 0%,rgba(10,133,117,.10),transparent 55%),var(--bg);background-attachment:fixed}
+.panel{background:var(--panel);border:1px solid var(--line);padding:20px 24px;margin-top:22px}
+.phead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px 16px;margin-bottom:10px}
+.phead p{margin:0;color:var(--muted);font-size:15px}
+/* Zeitband */
+.band{position:relative;margin-top:22px;background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 92%,var(--bg)));border:1px solid var(--line);border-radius:18px;padding:18px 22px 12px;box-shadow:var(--shadow-hi)}
+.band::before{content:"";position:absolute;inset:0;border-radius:18px;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.35),transparent 30%);mix-blend-mode:soft-light}
+.band .scroll{overflow-x:auto} .band svg{display:block;width:100%;min-width:900px;height:auto}
+.band .legend{display:flex;flex-wrap:wrap;gap:8px 10px;font-size:14px;color:var(--muted);margin-top:10px} .legend span{display:inline-flex;align-items:center;padding:4px 12px 4px 8px;border-radius:999px;background:color-mix(in srgb,var(--bg) 70%,var(--panel));border:1px solid var(--line)}
+.legend i{display:inline-block;width:16px;height:12px;margin-right:8px;border-radius:3px;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.legend .l-bar{background:var(--bar)} .legend .l-charge{background:var(--grid)} .legend .l-hold{background:var(--batt)}
+.legend .l-pv{background:var(--pvfill);border-top:2px solid var(--pv)} .legend .l-soc{height:0;border-top:3px solid var(--batt);margin-bottom:5px} .legend .l-heat{background:var(--heat)}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--panel);padding:10px 12px;font-size:14px;line-height:1.35;display:none;z-index:4;white-space:nowrap;border-radius:10px;box-shadow:0 12px 30px -8px rgba(0,0,0,.5)}
+.tip b{font-size:16px}
+/* Kacheln */
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:18px}
+#flow text{font-family:inherit} .node{filter:drop-shadow(0 6px 10px rgba(0,0,0,.25))}
+@media (prefers-reduced-motion:no-preference){.flowline{animation:dash 1.2s linear infinite}} @keyframes dash{to{stroke-dashoffset:-24}}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:10px}
+.day{border:1px solid var(--line);border-radius:12px;padding:10px 10px 8px;background:color-mix(in srgb,var(--panel) 80%,var(--bg));display:flex;flex-direction:column;gap:4px;min-width:0}
+.day.today{border-color:var(--batt);box-shadow:inset 0 0 0 1px var(--batt)}
+.day .dn{font-weight:600;font-size:15px} .day .dd{font-size:13px;color:var(--muted);margin-top:-4px}
+.day .pvbar{height:68px;display:flex;align-items:flex-end;gap:6px;margin:4px 0}
+.day .pvbar i{flex:1;border-radius:4px 4px 2px 2px;background:linear-gradient(180deg,var(--pv),color-mix(in srgb,var(--pv) 40%,transparent));min-height:2px}
+.day .pvbar i.load{background:linear-gradient(180deg,var(--p4),var(--p2))}
+.day .v{font-size:14px;display:flex;justify-content:space-between;gap:6px} .day .v span:last-child{font-weight:600;text-align:right}
+.day .temp{font-size:14px;color:var(--muted)} .day .heat{color:var(--heat)} .day .est{opacity:.7}
+.day .sur{font-size:13px;padding:2px 8px;border-radius:999px;align-self:flex-start;margin-top:2px} .day .sur.plus{background:color-mix(in srgb,var(--pv) 18%,transparent);color:var(--pv)} .day .sur.minus{background:color-mix(in srgb,var(--grid) 16%,transparent);color:var(--grid)}
+@media (max-width:900px){.week{grid-template-columns:repeat(4,1fr)}} @media (max-width:560px){.week{grid-template-columns:repeat(2,1fr)}}
+.hpkv{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px 14px;margin-top:10px;font-size:15px} .hpkv span{display:block;color:var(--muted);font-size:13px} .hpkv b{font-weight:600;font-size:17px}
+.cols .panel{margin-top:0}
+.big{font-size:46px;font-weight:600;line-height:1;margin:6px 0 2px;letter-spacing:-.01em;background:linear-gradient(135deg,var(--ink),color-mix(in srgb,var(--ink) 55%,var(--batt)));-webkit-background-clip:text;background-clip:text;color:transparent} .big small{font-size:20px;font-weight:400;color:var(--muted);margin-left:4px}
+.sub{color:var(--muted);font-size:15px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;font-size:16px;margin-top:8px} .kv span:first-child{color:var(--muted)} .kv .n{text-align:right}
+ol.steps{list-style:none;margin:8px 0 0;padding:0} ol.steps li{display:grid;grid-template-columns:62px 1fr auto;gap:0 12px;padding:7px 0;border-bottom:1px solid var(--line);align-items:baseline}
+ol.steps li:last-child{border-bottom:0} ol.steps .t{font-weight:600} ol.steps .p{color:var(--muted);white-space:nowrap}
+ol.steps li.charge .t{color:var(--grid)} ol.steps li.hold .t{color:var(--batt)} ol.steps li.heat .t{color:var(--heat)}
+.chip{display:inline-block;font-size:14px;padding:2px 12px;border:1px solid var(--line);border-radius:999px;color:var(--muted);margin:4px 6px 0 0} .chip.bad{border-color:var(--alert);color:var(--alert)} .chip.ok{border-color:var(--batt);color:var(--batt)}
+.log{font-size:15px;max-height:360px;overflow:auto} .log div{padding:5px 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:118px 1fr;gap:12px} .log div:last-child{border-bottom:0} .log .t{color:var(--muted);white-space:nowrap}
+.src{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px 24px}
+.src h3{margin-bottom:4px} .src .kv{margin-top:4px}
+a.plain{color:var(--ink)}
+.empty{padding:40px 0;text-align:center;color:var(--muted)}
+[hidden]{display:none!important}
+@media (max-width:640px){.wrap{padding:14px 16px 40px}.top a{padding:7px 12px;font-size:16px}.big{font-size:36px}header .acts{margin-left:0}}
+@media (prefers-reduced-motion:no-preference){.dot.on{animation:pulse 2.4s ease-in-out infinite}} @keyframes pulse{50%{box-shadow:0 0 0 8px rgba(10,133,117,0)}}
+</style>
+<link rel="stylesheet" href="/skins.css">
+<script src="/skins.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <nav class="top" aria-label="Bereiche"><a href="/">Monitor</a><a href="/einstellungen">Einstellungen</a><a href="/matching">Matching</a><a href="/planer" aria-current="page">Planer</a><a href="/anlage">Anlage</a><span class="copy">(C) by Elric M.</span></nav>
+  <header>
+    <h1>Planer</h1>
+    <div class="state"><span class="dot" id="dot"></span><span id="stateText">wird geladen …</span></div>
+    <div class="seg" role="group" aria-label="Betriebsart" id="modeSeg">
+      <button type="button" data-m="off">Aus</button><button type="button" data-m="simulate">Simulation</button><button type="button" data-m="active">Aktiv</button>
+    </div>
+    <div class="acts"><button class="b" type="button" id="replan">Neu planen</button><button class="b" type="button" id="refresh">Daten neu laden</button></div>
+  </header>
+  <div class="banner bad" id="err" hidden></div>
+  <div class="banner" id="note" hidden></div>
+
+  <section class="band" aria-label="Zeitband mit Preis, Prognose und Fahrplan">
+    <div class="phead"><h2>Die nächsten 36 Stunden</h2><p id="bandSub"></p><div class="seg" role="group" aria-label="Darstellung" id="styleSeg" style="font-size:14px"><button type="button" data-s="relief">Relief</button><button type="button" data-s="quader">Quader</button></div></div>
+    <div class="scroll"><svg id="svg" viewBox="0 0 1440 440" preserveAspectRatio="none" aria-describedby="bandSub"></svg></div>
+    <div class="legend">
+      <span><i class="l-bar" style="background:linear-gradient(90deg,var(--p1),var(--p5))"></i>Strompreis, hell = günstig</span><span><i class="l-charge"></i>aus dem Netz laden</span><span><i class="l-hold"></i>Batterie schonen</span>
+      <span><i class="l-pv"></i>PV-Prognose</span><span><i class="l-soc"></i>Ladezustand geplant</span><span><i class="l-heat"></i>Wärmepumpe anheben / absenken</span>
+    </div>
+    <div class="tip" id="tip"></div>
+  </section>
+
+  <div class="cols">
+    <section class="panel" aria-labelledby="hNext"><h2 id="hNext">Nächste Schritte</h2><ol class="steps" id="steps"></ol></section>
+    <section class="panel" aria-labelledby="hSave"><h2 id="hSave">Ersparnis im Zeitraum</h2>
+      <div class="big" id="saving">–<small>€</small></div><div class="sub" id="savingSub"></div>
+      <div class="kv" id="savingKv"></div>
+    </section>
+    <section class="panel" aria-labelledby="hFlow"><div class="phead"><h2 id="hFlow">Energiefluss jetzt</h2><p id="flowSub"></p></div>
+      <svg id="flow" viewBox="0 0 360 330" aria-describedby="flowSub" style="width:100%;height:auto;display:block"></svg>
+      <div id="hpBox"></div></section>
+  </div>
+
+  <section class="panel" aria-labelledby="hWeek"><div class="phead"><h2 id="hWeek">Wochenausblick</h2><p>Sieben Tage: Solarertrag, Temperatur und erwarteter Verbrauch. Preise jenseits der Börse sind aus dem Wochentagsmuster geschätzt.</p></div>
+    <div class="week" id="week"></div></section>
+  <section class="panel" aria-labelledby="hSrc"><div class="phead"><h2 id="hSrc">Datenquellen</h2><p>Was der Planer gerade weiß.</p></div><div class="src" id="src"></div></section>
+  <section class="panel" aria-labelledby="hLog"><h2 id="hLog">Protokoll</h2><div class="log" id="log"></div></section>
+</div>
+
+<script>
+(function(){
+'use strict';
+var $=function(id){return document.getElementById(id);};
+var esc=function(s){return String(s===undefined||s===null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+var nf=function(v,d){return v===null||v===undefined||isNaN(v)?'–':Number(v).toLocaleString('de-DE',{minimumFractionDigits:d,maximumFractionDigits:d});};
+var hm=function(t){return new Date(t).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});};
+var dayName=function(t){var d=new Date(t),n=new Date();n.setHours(0,0,0,0);var diff=Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate())-n)/86400000);return diff===0?'Heute':diff===1?'Morgen':diff===2?'Übermorgen':d.toLocaleDateString('de-DE',{weekday:'long'});};
+var MODES={off:'Aus',simulate:'Simulation',active:'Aktiv'};
+var D=null, LIVE=null, busy=false;
+
+function api(body){ var o=body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{cache:'no-store'}; return fetch('/api/planer',o).then(function(r){return r.json();}); }
+
+function load(){ Promise.all([api(), fetch('/api/live',{cache:'no-store'}).then(function(r){return r.json();}).catch(function(){return null;})]).then(function(a){ var j=a[0]; LIVE=a[1]; if(j.error&&!j.mode){ $('err').hidden=false; $('err').textContent=j.error; return; } D=j; render(); }).catch(function(e){ $('err').hidden=false; $('err').textContent='Die Steuerung antwortet nicht: '+e.message; }); }
+
+/* ---------- Kopf ---------- */
+function renderHead(){
+  var m=D.mode, dot=$('dot'); dot.className='dot '+(m==='active'?'on':m==='simulate'?'sim':'off');
+  var now=D.now, parts=[];
+  if(m==='off') parts.push('aus, es wird nichts geplant');
+  else { parts.push(m==='active'?'aktiv':'Simulation, schreibt nichts');
+    if(now) parts.push('jetzt '+nf(now.buy,1)+' ct/kWh, '+actionText(now)+(D.heatpump&&D.params.heat.enabled?', Wärmepumpe '+shiftText(now.shift):'')); }
+  if(D.pausedWhy) parts.push(D.pausedWhy==='matching'?'Pause: Matching läuft':'Pause: keine Messwerte');
+  $('stateText').textContent=parts.join(' · ');
+  Array.prototype.forEach.call($('modeSeg').querySelectorAll('button'),function(b){ b.setAttribute('aria-pressed',String(b.getAttribute('data-m')===m)); b.disabled=busy; });
+  var note=[];
+  if(m!=='off'&&D.prices.source==='none') note.push('Es ist keine Strombörse eingestellt, der Planer rechnet mit dem festen Ersatzpreis. Für dynamische Tarife auf der Seite <a class="plain" href="/anlage">Anlage</a> die Börse wählen.');
+  if(m!=='off'&&!D.totals) note.push('Der erste Fahrplan wird gerade berechnet.');
+  if(m==='active'&&D.params.heat.enabled&&D.heatpump&&!D.heatpump.writeEnabled) note.push('Die Wärmepumpe wird nur gelesen: „Schreiben erlauben“ ist auf der Seite Anlage nicht gesetzt.');
+  $('note').hidden=!note.length; $('note').innerHTML=note.join('<br>');
+  var bad=[]; if(D.prices.error) bad.push('Strompreise: '+esc(D.prices.error)); if(D.forecast.error) bad.push('Prognose: '+esc(D.forecast.error)); if(D.heatpump&&D.heatpump.error) bad.push('Wärmepumpe: '+esc(D.heatpump.error));
+  $('err').hidden=!bad.length; $('err').innerHTML=bad.join('<br>');
+}
+function actionText(s){ return s.action==='charge'?'aus dem Netz laden mit '+nf(s.chargeW,0)+' W':s.action==='hold'?'Batterie schonen':'Eigenverbrauch'; }
+function shiftText(k){ return k>0?'+'+k+' K':k<0?k+' K':'normal'; }
+
+/* ---------- Zeitband ---------- */
+var W=1440,H=440,L=56,R=100,T=42,B=56,HEAT=14,PX=26,PY=-16;   // PX/PY: Raumtiefe (schräg nach hinten rechts oben)
+function bandStyle(){ try{ return localStorage.getItem('sungrow-band')||'relief'; }catch(e){ return 'relief'; } }
+function setBandStyle(v){ try{ localStorage.setItem('sungrow-band',v); }catch(e){} renderBand(); }
+function movAvg(arr,k){ var out=[]; for(var i=0;i<arr.length;i++){ var a=0,c=0; for(var j=i-k;j<=i+k;j++){ if(j>=0&&j<arr.length){ a+=arr[j]; c++; } } out.push(a/c); } return out; }
+function smoothPath(p){ var d='M'+p[0][0]+' '+p[0][1]; for(var i=0;i<p.length-1;i++){ var p0=p[Math.max(0,i-1)],p1=p[i],p2=p[i+1],p3=p[Math.min(p.length-1,i+2)];
+  var c1=[p1[0]+(p2[0]-p0[0])/6,p1[1]+(p2[1]-p0[1])/6], c2=[p2[0]-(p3[0]-p1[0])/6,p2[1]-(p3[1]-p1[1])/6]; d+=' C'+c1[0]+' '+c1[1]+' '+c2[0]+' '+c2[1]+' '+p2[0]+' '+p2[1]; } return d; }
+function bandDefs(){ return '<defs>'+
+ '<linearGradient id="gPv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--pv)" stop-opacity=".42"/><stop offset="1" stop-color="var(--pv)" stop-opacity=".03"/></linearGradient>'+
+ '<linearGradient id="gSoc" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="var(--batt)"/><stop offset="1" stop-color="color-mix(in srgb,var(--batt) 55%,white)"/></linearGradient>'+
+ '<linearGradient id="gFloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".14"/><stop offset="1" stop-color="currentColor" stop-opacity=".03"/></linearGradient>'+
+ '<linearGradient id="gWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity="0"/><stop offset="1" stop-color="currentColor" stop-opacity=".07"/></linearGradient>'+
+ '<linearGradient id="gRelief" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--p5)"/><stop offset=".45" stop-color="var(--p3)"/><stop offset="1" stop-color="var(--p1)"/></linearGradient>'+
+ '<linearGradient id="gCharge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--grid)" stop-opacity=".95"/><stop offset="1" stop-color="var(--grid)" stop-opacity=".35"/></linearGradient>'+
+ '<linearGradient id="gHold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--batt)" stop-opacity=".9"/><stop offset="1" stop-color="var(--batt)" stop-opacity=".3"/></linearGradient>'+
+ '<filter id="glow" x="-10%" y="-40%" width="120%" height="180%"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'+
+ '<filter id="soft" x="-5%" y="-10%" width="110%" height="130%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000" flood-opacity=".2"/></filter>'+
+ '</defs>'; }
+function bandGeom(plan){
+  var n=plan.length, iw=(W-L-R)/n, ph=H-T-B-HEAT-10;
+  var pmax=Math.max.apply(null,plan.map(function(s){return s.buy;}))*1.08, pmin=Math.min(0,Math.min.apply(null,plan.map(function(s){return s.buy;}))), pvmax=Math.max(1000,Math.max.apply(null,plan.map(function(s){return s.pvW;})));
+  var y=function(v){return T+ph-(v-pmin)/(pmax-pmin)*ph;}, ypv=function(w){return T+ph-w/pvmax*ph*0.8;}, ysoc=function(p){return T+ph-p/100*ph;};
+  return {n:n,iw:iw,ph:ph,pmax:pmax,pmin:pmin,pvmax:pvmax,y:y,ypv:ypv,ysoc:ysoc,base:y(0),X0:L,X1:W-R};
+}
+/* Raum: Rückwand, Boden, Raster, Tiefenlinien, Solarprognose an der Rückwand */
+function bandRoom(c,plan){ var h='', X0=c.X0,X1=c.X1,base=c.base, i;
+  h+='<polygon points="'+(X0+PX)+','+(T+PY)+' '+(X1+PX)+','+(T+PY)+' '+(X1+PX)+','+(base+PY)+' '+(X0+PX)+','+(base+PY)+'" fill="url(#gWall)"/>';
+  h+='<polygon points="'+X0+','+base+' '+X1+','+base+' '+(X1+PX)+','+(base+PY)+' '+(X0+PX)+','+(base+PY)+'" fill="url(#gFloor)"/>';
+  for(i=0;i<c.n;i++){ var hr=new Date(plan[i].t).getHours(); if(hr<6||hr>=21){ var xa=X0+i*c.iw, xb=xa+c.iw+0.5; h+='<polygon points="'+(xa+PX)+','+(T+PY)+' '+(xb+PX)+','+(T+PY)+' '+(xb+PX)+','+(base+PY)+' '+(xa+PX)+','+(base+PY)+'" fill="currentColor" opacity=".025"/>'; } }
+  var stepCt=c.pmax>60?20:c.pmax>30?10:5;
+  for(var v=Math.ceil(c.pmin/stepCt)*stepCt; v<=c.pmax; v+=stepCt){ var yy=c.y(v); h+='<line x1="'+(X0+PX)+'" x2="'+(X1+PX)+'" y1="'+(yy+PY)+'" y2="'+(yy+PY)+'" stroke="currentColor" opacity=".14"/><line x1="'+X0+'" x2="'+(X0+PX)+'" y1="'+yy+'" y2="'+(yy+PY)+'" stroke="currentColor" opacity=".14"/><text x="'+(X0-8)+'" y="'+(yy+5)+'" text-anchor="end" font-size="13" fill="currentColor" opacity=".6">'+v+'</text>'; }
+  h+='<text x="'+(X0-8)+'" y="'+(T-10)+'" text-anchor="end" font-size="13" fill="currentColor" opacity=".6">ct/kWh</text>';
+  for(i=0;i<c.n;i++){ var dt=new Date(plan[i].t); if(dt.getMinutes()!==0) continue; var hh=dt.getHours(), x2=X0+i*c.iw, strong=hh%3===0;
+    h+='<line x1="'+x2+'" x2="'+(x2+PX)+'" y1="'+base+'" y2="'+(base+PY)+'" stroke="currentColor" opacity="'+(strong?'.28':'.1')+'"/>';
+    if(strong) h+='<line x1="'+(x2+PX)+'" x2="'+(x2+PX)+'" y1="'+(T+PY)+'" y2="'+(base+PY)+'" stroke="currentColor" opacity=".08"/>';
+    if(hh===0) h+='<line x1="'+x2+'" x2="'+x2+'" y1="'+T+'" y2="'+base+'" stroke="currentColor" opacity=".22" stroke-dasharray="3 4"/>'; }
+  h+='<line x1="'+X0+'" x2="'+X1+'" y1="'+base+'" y2="'+base+'" stroke="currentColor" opacity=".4"/><line x1="'+X1+'" x2="'+(X1+PX)+'" y1="'+base+'" y2="'+(base+PY)+'" stroke="currentColor" opacity=".4"/><line x1="'+X0+'" x2="'+(X0+PX)+'" y1="'+base+'" y2="'+(base+PY)+'" stroke="currentColor" opacity=".4"/>';
+  var pvB=movAvg(plan.map(function(s){return s.pvW;}),2), bp=pvB.map(function(v,i){ return [X0+(i+0.5)*c.iw+PX, c.ypv(v)+PY]; }), dl=smoothPath(bp);
+  var d=dl+' L'+bp[c.n-1][0]+' '+(base+PY)+' L'+bp[0][0]+' '+(base+PY)+' Z';
+  h+='<path d="'+d+'" fill="url(#gPv)"/><path d="'+dl+'" fill="none" stroke="var(--pv)" stroke-width="2" opacity=".85" filter="url(#glow)"/>';
+  h+='<text x="'+(X1+PX+8)+'" y="'+(T+PY-2)+'" font-size="13" fill="var(--pv)">kW PV</text>';
+  for(v=0; v<=c.pvmax; v+= c.pvmax>8000?4000:2000){ h+='<text x="'+(X1+PX+8)+'" y="'+(c.ypv(v)+PY+5)+'" font-size="13" fill="var(--pv)" opacity=".8">'+(v/1000)+'</text>'; }
+  var unk=-1; for(i=0;i<c.n;i++){ if(!plan[i].known){ unk=i; break; } }
+  if(unk>0) h+='<text x="'+(X0+unk*c.iw+PX+6)+'" y="'+(T+PY+14)+'" font-size="13" fill="currentColor" opacity=".6">ab hier geschätzt (Preise von morgen ab ca. 13 Uhr)</text>';
+  return h; }
+/* Vordergrund: Ladezustand, Wärmepumpe, Zeitachse, Jetzt */
+function bandFront(c,plan){ var h='', X0=c.X0,X1=c.X1,base=c.base, d='', i;
+  for(i=0;i<c.n;i++) d+=(i?' L':'M')+(X0+(i+0.5)*c.iw)+' '+c.ysoc(plan[i].socBase);
+  h+='<path d="'+d+'" fill="none" stroke="var(--batt)" stroke-width="1.5" stroke-dasharray="4 5" opacity=".5"/>';
+  d=''; for(i=0;i<c.n;i++) d+=(i?' L':'M')+(X0+(i+0.5)*c.iw)+' '+c.ysoc(plan[i].soc);
+  h+='<path d="'+d+'" fill="none" stroke="#000" stroke-opacity=".22" stroke-width="7" stroke-linejoin="round" transform="translate(2,5)" filter="url(#glow)"/>';
+  h+='<path d="'+d+'" fill="none" stroke="url(#gSoc)" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round" filter="url(#glow)"/>';
+  h+='<text x="'+(X1+PX+50)+'" y="'+(c.ysoc(100)+5)+'" font-size="13" fill="var(--batt)">100 %</text><text x="'+(X1+PX+50)+'" y="'+(c.ysoc(50)+5)+'" font-size="13" fill="var(--batt)">50 %</text><text x="'+(X1+PX+50)+'" y="'+(c.ysoc(0)+5)+'" font-size="13" fill="var(--batt)">0 %</text>';
+  var yh=base+10;
+  for(i=0;i<c.n;i++){ if(!plan[i].shift) continue; var up=plan[i].shift>0; h+='<rect rx="2" x="'+(X0+i*c.iw+0.6)+'" y="'+(up?yh:yh+HEAT/2)+'" width="'+Math.max(1,c.iw-1.2)+'" height="'+(HEAT/2)+'" fill="var(--heat)"'+(up?'':' opacity=".5"')+'/>'; }
+  h+='<line x1="'+X0+'" x2="'+X1+'" y1="'+(yh+HEAT/2)+'" y2="'+(yh+HEAT/2)+'" stroke="var(--heat)" opacity=".3"/>';
+  var yx=base+HEAT+14;
+  for(i=0;i<c.n;i++){ var dt=new Date(plan[i].t); if(dt.getMinutes()!==0) continue; var hh=dt.getHours(), x3=X0+i*c.iw;
+    if(hh%3===0) h+='<line x1="'+x3+'" x2="'+x3+'" y1="'+yx+'" y2="'+(yx+6)+'" stroke="currentColor" opacity=".5"/><text x="'+x3+'" y="'+(yx+22)+'" text-anchor="middle" font-size="13" fill="currentColor" opacity=".75">'+hh+'</text>';
+    if(hh===0||i===0) h+='<text x="'+(x3+6)+'" y="'+(yx+40)+'" font-size="15" font-weight="600" fill="currentColor">'+esc(dayName(plan[i].t))+'</text>'; }
+  var now=Date.now(), ni=-1; for(i=0;i<c.n;i++) if(plan[i].t<=now&&now<plan[i].t+900000) ni=i;
+  if(ni>=0){ var xn=X0+(ni+(now-plan[ni].t)/900000)*c.iw; h+='<line x1="'+xn+'" x2="'+xn+'" y1="'+(T-14)+'" y2="'+(yx+6)+'" stroke="var(--alert)" stroke-width="2" filter="url(#glow)"/><line x1="'+xn+'" x2="'+(xn+PX)+'" y1="'+base+'" y2="'+(base+PY)+'" stroke="var(--alert)" stroke-width="2" opacity=".7"/><circle cx="'+xn+'" cy="'+(T-14)+'" r="4" fill="var(--alert)"/><text x="'+(xn+8)+'" y="'+(T-8)+'" font-size="13" font-weight="600" fill="var(--alert)">jetzt '+hm(now)+'</text>'; }
+  h+='<rect id="hover" x="0" y="'+T+'" width="'+c.iw+'" height="'+(c.ph+HEAT+10)+'" fill="currentColor" opacity="0" rx="3"/>';
+  return h; }
+/* Entwurf Relief: Preis als geglättete Landschaft mit Aktionszonen */
+function bandRelief(c,plan){ var h='', X0=c.X0,X1=c.X1,base=c.base,n=c.n,iw=c.iw,i;
+  var buyS=movAvg(plan.map(function(s){return s.buy;}),3), pvS=movAvg(plan.map(function(s){return s.pvW;}),2);
+  var pts=buyS.map(function(v,i){ return [X0+(i+0.5)*iw, c.y(v)]; }); pts.unshift([X0,c.y(buyS[0])]); pts.push([X1,c.y(buyS[n-1])]);
+  var line=smoothPath(pts), backPts=pts.map(function(p){ return [p[0]+PX*0.45,p[1]+PY*0.45]; });
+  h+='<path d="'+smoothPath(backPts)+' L'+backPts[backPts.length-1][0]+' '+(base+PY*0.45)+' L'+backPts[0][0]+' '+(base+PY*0.45)+' Z" fill="var(--p4)" opacity=".35"/>';
+  var area=line+' L'+X1+' '+base+' L'+X0+' '+base+' Z';
+  h+='<g filter="url(#soft)"><path d="'+area+'" fill="url(#gRelief)"/></g><path d="'+line+'" fill="none" stroke="var(--p5)" stroke-width="2" opacity=".8"/>';
+  h+='<clipPath id="clipA"><path d="'+area+'"/></clipPath>';
+  i=0; while(i<n){ var a=plan[i].action; if(a==='normal'){ i++; continue; } var j=i; while(j<n&&plan[j].action===a) j++;
+    var xa=X0+i*iw, xb=X0+j*iw; h+='<rect x="'+xa+'" y="'+T+'" width="'+(xb-xa)+'" height="'+(base-T)+'" fill="url(#'+(a==='charge'?'gCharge':'gHold')+')" clip-path="url(#clipA)"/><rect x="'+xa+'" y="'+(base-3)+'" width="'+(xb-xa)+'" height="5" rx="2" fill="'+(a==='charge'?'var(--grid)':'var(--batt)')+'"/>'; i=j; }
+  // Solar zusätzlich vorn als zarte Fläche, damit sie nicht hinter dem Relief verschwindet
+  var pvPts=pvS.map(function(v,i){ return [X0+(i+0.5)*iw, c.ypv(v)]; }); var dpl=smoothPath(pvPts);
+  h+='<path d="'+dpl+' L'+pvPts[n-1][0]+' '+base+' L'+pvPts[0][0]+' '+base+' Z" fill="var(--pv)" opacity=".14"/><path d="'+dpl+'" fill="none" stroke="var(--pv)" stroke-width="2.5" opacity=".9" filter="url(#glow)"/>';
+  // geschätzter Bereich leicht abgeblendet
+  var unk=-1; for(i=0;i<n;i++){ if(!plan[i].known){ unk=i; break; } }
+  if(unk>0) h+='<rect x="'+(X0+unk*iw)+'" y="'+T+'" width="'+(X1-X0-unk*iw)+'" height="'+(base-T)+'" fill="var(--panel)" opacity=".28" clip-path="url(#clipA)"/>';
+  return h; }
+/* Entwurf Quader: feine Balken mit Preisschattierung und leichter Tiefe */
+function bandQuader(c,plan){ var X0=c.X0,base=c.base,n=c.n,iw=c.iw, DX=Math.min(5,iw*0.45), DY=PY*0.3, bars='';
+  for(var i=0;i<n;i++){ var s=plan[i], x=X0+i*iw+1, w=Math.max(1,iw-2.2), top=c.y(Math.max(0,s.buy)), hh=Math.max(1,base-top);
+    var q=(s.buy-c.pmin)/(c.pmax-c.pmin), lvl=q<.3?'var(--p1)':q<.45?'var(--p2)':q<.6?'var(--p3)':q<.75?'var(--p4)':'var(--p5)';
+    var solid=s.action==='charge'?'var(--grid)':s.action==='hold'?'var(--batt)':lvl;
+    var sideP=(x+w)+','+(top+2)+' '+(x+w+DX)+','+(top+2+DY)+' '+(x+w+DX)+','+(base+DY)+' '+(x+w)+','+base, capP=(x+1)+','+top+' '+(x+1+DX)+','+(top+DY)+' '+(x+w+DX)+','+(top+DY)+' '+(x+w)+','+top;
+    bars+='<g'+(s.known?'':' opacity=".5"')+'><polygon points="'+sideP+'" fill="'+solid+'"/><polygon points="'+sideP+'" fill="#000" opacity=".22"/><polygon points="'+capP+'" fill="'+solid+'"/><polygon points="'+capP+'" fill="#fff" opacity=".35"/><rect x="'+x+'" y="'+top+'" width="'+w+'" height="'+hh+'" rx="2" fill="'+solid+'"'+(s.action==='hold'?' opacity=".85"':'')+'/></g>'; }
+  return '<g filter="url(#soft)">'+bars+'</g>'; }
+function renderBand(){
+  var svg=$('svg'), plan=D.plan, style=bandStyle();
+  Array.prototype.forEach.call($('styleSeg').querySelectorAll('button'),function(b){ b.setAttribute('aria-pressed',String(b.getAttribute('data-s')===style)); b.onclick=function(){ setBandStyle(b.getAttribute('data-s')); }; });
+  if(!plan||!plan.length){ svg.innerHTML='<text x="720" y="200" text-anchor="middle" fill="currentColor" font-size="20" opacity=".6">Noch kein Fahrplan. Betriebsart Simulation oder Aktiv wählen.</text>'; $('bandSub').textContent=''; return; }
+  var c=bandGeom(plan), h=bandDefs()+bandRoom(c,plan)+(style==='quader'?bandQuader(c,plan):bandRelief(c,plan))+bandFront(c,plan);
+  svg.innerHTML=h;
+  var n=c.n, iw=c.iw, X0=c.X0, t=D.totals; $('bandSub').textContent='Plan von '+hm(D.plannedAt)+', Batterie '+nf(t.capacityKwh,1)+' kWh ab '+nf(t.soc0,0)+' %'+(t.loadLearned?', Lastprofil aus '+t.loadDays+' Tagen':', Lastprofil noch im Aufbau');
+  var tip=$('tip'), band=svg.parentNode.parentNode, hov=svg.querySelector('#hover');
+  svg.onmousemove=function(ev){ var r=svg.getBoundingClientRect(); var i2=Math.floor(((ev.clientX-r.left)/r.width*W-X0)/iw); if(i2<0||i2>=n){ tip.style.display='none'; hov.setAttribute('opacity','0'); return; }
+    hov.setAttribute('x',X0+i2*iw); hov.setAttribute('opacity','.08');
+    var q=plan[i2]; tip.style.display='block'; tip.innerHTML='<b>'+esc(dayName(q.t))+' '+hm(q.t)+'</b><br>'+nf(q.buy,1)+' ct/kWh'+(q.spot!==null?' (Börse '+nf(q.spot,1)+')':'')+(q.known?'':' geschätzt')+'<br>'+esc(actionText(q))+'<br>PV '+nf(q.pvW/1000,1)+' kW · Last '+nf(q.loadW/1000,1)+' kW'+(q.heatW?' (davon Wärmepumpe '+nf(q.heatW/1000,1)+')':'')+'<br>Ladezustand '+nf(q.soc,0)+' % (ohne Planer '+nf(q.socBase,0)+' %)'+(q.tempC!==null?'<br>Außen '+nf(q.tempC,1)+' °C':'')+(D.params.heat.enabled?' · Wärmepumpe '+shiftText(q.shift):'');
+    var br=band.getBoundingClientRect(); var left=ev.clientX-br.left+14; if(left+tip.offsetWidth>br.width-10) left=ev.clientX-br.left-tip.offsetWidth-14; tip.style.left=left+'px'; tip.style.top=(ev.clientY-br.top+14)+'px'; };
+  svg.onmouseleave=function(){ tip.style.display='none'; hov.setAttribute('opacity','0'); };
+}
+
+/* ---------- Kacheln ---------- */
+function renderSteps(){
+  var ol=$('steps'), plan=D.plan||[], now=Date.now(), items=[], last=null;
+  for(var i=0;i<plan.length;i++){ var s=plan[i]; if(s.t+900000<now) continue;
+    var key=s.action+'|'+(s.action==='charge'?s.chargeW:'')+'|'+s.shift;
+    if(!last||last.key!==key){ last={key:key,from:s.t,to:s.t+900000,s:s,sum:0,n:0}; items.push(last);} else last.to=s.t+900000;
+    last.sum+=s.buy; last.n++; }
+  items=items.filter(function(x){return x.s.action!=='normal'||x.s.shift;}).slice(0,8);
+  if(!items.length){ ol.innerHTML='<li><span class="t">–</span><span>Keine Eingriffe geplant: Eigenverbrauch ist im Zeitraum am günstigsten.</span><span class="p"></span></li>'; return; }
+  ol.innerHTML=items.map(function(x){ var s=x.s, cls=s.action==='charge'?'charge':s.action==='hold'?'hold':'heat';
+    var what=s.action==='charge'?'Aus dem Netz laden, '+nf(s.chargeW,0)+' W':s.action==='hold'?'Batterie schonen':'';
+    if(s.shift) what+=(what?' · ':'')+'Wärmepumpe '+(s.shift>0?'anheben +'+s.shift+' K':'absenken '+s.shift+' K');
+    return '<li class="'+cls+'"><span class="t">'+hm(x.from)+'</span><span>'+esc(what)+'<br><span class="sub">'+esc(dayName(x.from))+' bis '+hm(x.to)+'</span></span><span class="p">Ø '+nf(x.sum/x.n,1)+' ct</span></li>'; }).join('');
+}
+function renderSaving(){
+  var t=D.totals; if(!t){ $('saving').innerHTML='–<small>€</small>'; $('savingSub').textContent=''; $('savingKv').innerHTML=''; return; }
+  var tot=t.savingEur+(t.heatSavingEur||0);
+  $('saving').innerHTML=nf(tot,2)+'<small>€</small>';
+  $('savingSub').textContent=(D.mode==='simulate'?'würde der Planer in den nächsten '+t.hours+' Stunden sparen (Simulation)':D.mode==='active'?'spart der Planer in den nächsten '+t.hours+' Stunden voraussichtlich':'rechnerisch möglich in den nächsten '+t.hours+' Stunden');
+  var days=Object.keys(D.savings||{}).sort().slice(-7), sum=0; days.forEach(function(d){ sum+=(D.savings[d].planned||0)+(D.savings[d].heat||0); });
+  $('savingKv').innerHTML='<span>ohne Planer</span><span class="n">'+nf(t.baseCostEur,2)+' €</span><span>mit Planer</span><span class="n">'+nf(t.planCostEur,2)+' €</span>'+
+    '<span>davon Batterie</span><span class="n">'+nf(t.savingEur,2)+' € ('+t.moves+' Eingriffe)</span>'+(D.params.heat.enabled?'<span>davon Wärmepumpe</span><span class="n">'+nf(t.heatSavingEur,2)+' € ('+nf(t.heatMovedKwh,1)+' kWh verschoben)</span>':'')+
+    '<span>Verbrauch / PV erwartet</span><span class="n">'+nf(t.loadKwh,0)+' / '+nf(t.pvKwh,0)+' kWh</span>'+(days.length>1?'<span>Summe der Pläne, '+days.length+' Tage</span><span class="n">'+nf(sum,2)+' €</span>':'');
+}
+/* Energiefluss: Solar, Netz, Batterie, Haus, Wärmepumpe, E-Auto als Knoten; Linien fließen in Richtung der Energie */
+function renderHp(){
+  var svg=$('flow'), h=D.heatpump, inv=LIVE&&LIVE.live?LIVE.live:null;
+  var pv=inv?inv.plant.pvPower:0, grid=inv?inv.inverter.gridPower:0, bat=inv?inv.inverter.battery.power:0, house=inv?inv.plant.loadPower:0, soc=inv?inv.inverter.battery.soc:null;
+  var hv=h&&h.live?h.live.values:{}, hpFresh=h&&h.live&&Date.now()-h.at<10*60000;
+  var M=(LIVE&&LIVE.meters)||[], sumRole=function(r){ var l=M.filter(function(x){return x.role===r&&x.fresh;}); return l.length?l.reduce(function(a,x){return a+x.watts;},0):null; };
+  var mHouse=sumRole('house'), mHp=sumRole('heatpump'), carW=sumRole('car');
+  if(mHouse!==null) house=mHouse;
+  var hpW = mHp!==null ? mHp : (hpFresh&&hv.elPower!==undefined ? hv.elPower : (hpFresh&&h&&h.live.running ? (D.totals&&D.totals.heat?Math.max(600,D.totals.heat.wattsPerKelvin*Math.max(1,D.params.heat.limitTemp-(hv.outdoorTemp||5))):1500) : 0));
+  var hpEst = mHp===null && hpFresh && hv.elPower===undefined && hpW>0;
+  var hasHpNode = !!h || mHp!==null;
+  var kw=function(w){ return nf(Math.abs(w)/1000,Math.abs(w)<10000?2:1)+' kW'; };
+  var N={ solar:{x:70,y:48,c:'var(--pv)',t:'Solar',v:pv>0?kw(pv):'–'}, grid:{x:290,y:48,c:'var(--grid)',t:'Netz',v:grid?kw(grid)+(grid>0?' Bezug':' Einsp.'):'0 kW'},
+          house:{x:180,y:150,c:'var(--ink)',t:'Haus',v:kw(house)}, batt:{x:70,y:245,c:'var(--batt)',t:'Batterie',v:(soc!==null?nf(soc,0)+' %':'–')+(bat?' · '+kw(bat)+(bat>0?' lädt':' entlädt'):'')},
+          hp:{x:290,y:245,c:'var(--heat)',t:'Wärme-\npumpe',v:hasHpNode?(mHp!==null?kw(hpW):(hpFresh?(hpW>0?(hpEst?'≈ ':'')+kw(hpW):'steht'):'keine Werte')):'nicht eingerichtet'}, car:{x:180,y:258,c:'var(--muted)',t:'E-Auto',v:carW===null?'nicht gemessen':kw(carW)} };
+  var out='<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>';
+  var edge=function(a,b,w,color){ if(!(Math.abs(w)>20)) return ''; var from=w>0?N[a]:N[b], to=w>0?N[b]:N[a]; var sw=Math.max(2,Math.min(10,Math.abs(w)/800));
+    var mx=(from.x+to.x)/2, my=(from.y+to.y)/2, dx=to.x-from.x, dy=to.y-from.y, len=Math.hypot(dx,dy), ux=dx/len, uy=dy/len;
+    var x1=from.x+ux*34, y1=from.y+uy*34, x2=to.x-ux*36, y2=to.y-uy*36;
+    return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+color+'" stroke-width="'+(sw+4)+'" opacity=".18" stroke-linecap="round"/>'+
+           '<line class="flowline" x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+color+'" stroke-width="'+sw+'" stroke-dasharray="10 14" stroke-linecap="round" style="color:'+color+'" marker-end="url(#arr)"/>'; };
+  // Flüsse: Solar → Haus (was nicht in Batterie/Netz geht), Netz ↔ Haus, Batterie ↔ Haus, Haus → Wärmepumpe
+  var pvToBat=Math.max(0,Math.min(pv,bat)), pvToGrid=Math.max(0,Math.min(pv-pvToBat,-grid)), pvToHouse=Math.max(0,pv-pvToBat-pvToGrid);
+  out+=edge('solar','house',pvToHouse,'var(--pv)')+edge('solar','batt',pvToBat,'var(--pv)')+edge('solar','grid',pvToGrid,'var(--pv)');
+  out+=edge('grid','house',Math.max(0,grid),'var(--grid)')+edge('batt','house',Math.max(0,-bat),'var(--batt)')+edge('grid','batt',Math.max(0,bat-pvToBat),'var(--grid)');
+  if(hasHpNode&&hpW>0) out+=edge('house','hp',hpW,'var(--heat)');
+  if(carW!==null&&carW>20) out+=edge('house','car',carW,'var(--grid)');
+  Object.keys(N).forEach(function(k){ var o=N[k], dim=(k==='car'&&carW===null)||(k==='hp'&&!hasHpNode);
+    out+='<g class="node" opacity="'+(dim?'.45':'1')+'"><circle cx="'+o.x+'" cy="'+o.y+'" r="30" fill="var(--panel)" stroke="'+o.c+'" stroke-width="3"/>'+
+      (k==='batt'&&soc!==null?'<rect x="'+(o.x-18)+'" y="'+(o.y+10)+'" width="36" height="7" rx="2" fill="var(--track)"/><rect x="'+(o.x-18)+'" y="'+(o.y+10)+'" width="'+(36*soc/100)+'" height="7" rx="2" fill="'+o.c+'"/>':'')+
+      (o.t.indexOf('\n')>=0?'<text x="'+o.x+'" y="'+(o.y-1)+'" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">'+esc(o.t.split('\n')[0])+'</text><text x="'+o.x+'" y="'+(o.y+13)+'" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">'+esc(o.t.split('\n')[1])+'</text>'
+        :'<text x="'+o.x+'" y="'+(o.y+(k==='batt'?2:5))+'" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">'+esc(o.t)+'</text>')+
+      (k==='house'?'<text x="'+(o.x-38)+'" y="'+(o.y+5)+'" text-anchor="end" font-size="14" fill="var(--muted)">'+esc(o.v)+'</text>':'<text x="'+o.x+'" y="'+(o.y+44)+'" text-anchor="middle" font-size="14" fill="var(--muted)">'+esc(o.v)+'</text>')+'</g>'; });
+  svg.innerHTML=out;
+  $('flowSub').textContent=inv?'Messung '+hm(LIVE.lastOk):'keine Messwerte';
+  var box=$('hpBox'), extra=M.filter(function(x){return x.role==='custom';});
+  var extraHtml=extra.length?'<div class="hpkv" style="margin-top:12px">'+extra.map(function(x){ return '<div><span>'+esc(x.name)+'</span><b>'+(x.fresh?kw(x.watts):'–')+'</b></div>'; }).join('')+'</div>':'';
+  if(!h){ box.innerHTML=extraHtml+'<p class="sub" style="margin-top:8px">Keine Wärmepumpe eingerichtet. Auf der Seite <a class="plain" href="/anlage">Anlage</a> lässt sie sich anbinden.</p>'; return; }
+  var html='<div class="hpkv">';
+  var rows=[['Außen',hv.outdoorTemp,'°C'],['Vorlauf',hv.flowTemp,'°C'],['Rücklauf',hv.returnTemp,'°C'],['Warmwasser',hv.dhwTemp,'°C'],['Anforderung',hv.demandPct,'%'],['Energie heute',hv.energyToday,'kWh']];
+  rows.forEach(function(r){ if(hpFresh&&r[1]!==undefined) html+='<div><span>'+r[0]+'</span><b>'+nf(r[1],r[2]==='°C'?1:0)+' '+r[2]+'</b></div>'; });
+  html+='<div><span>Verschiebung</span><b>'+(h.shift===null?'–':shiftText(h.shift))+(D.shift!==h.shift?' → '+shiftText(D.shift):'')+'</b></div>';
+  html+='<div><span>Zustand</span><b>'+(hpFresh?esc(h.live.stateText||(h.live.running?'läuft':'steht')):'keine Werte')+'</b></div></div>';
+  if(hpEst) html+='<p class="sub" style="margin-top:8px">Leistung geschätzt, weil das Register „Elektrische Leistung“ nicht eingeschaltet ist.</p>';
+  if(h.writeError) html+='<p class="chip bad">'+esc(h.writeError)+'</p>';
+  box.innerHTML=html+extraHtml;
+}
+function renderWeek(){
+  var box=$('week'), ol=D.outlook;
+  if(!ol||!ol.length){ box.innerHTML='<p class="sub">Noch keine Prognose. Standort und Dachflächen auf der Seite Anlage eintragen.</p>'; return; }
+  var maxK=Math.max(5,Math.max.apply(null,ol.map(function(d){return Math.max(d.pvKwh||0,d.loadKwh||0);})));
+  var wd=['So','Mo','Di','Mi','Do','Fr','Sa'];
+  box.innerHTML=ol.map(function(d,i){ var dt=new Date(d.t), pv=d.pvKwh===null?0:d.pvKwh, sur=d.surplusKwh;
+    return '<div class="day'+(i===0?' today':'')+'"><div class="dn">'+(i===0?'Heute':i===1?'Morgen':wd[dt.getDay()])+'</div><div class="dd">'+dt.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+'</div>'+
+      '<div class="pvbar" title="Solar '+nf(pv,1)+' kWh, Verbrauch '+nf(d.loadKwh,1)+' kWh"><i style="height:'+Math.max(2,pv/maxK*100)+'%"></i><i class="load" style="height:'+Math.max(2,d.loadKwh/maxK*100)+'%"></i></div>'+
+      '<div class="v"><span>Solar</span><span>'+(d.pvKwh===null?'–':nf(pv,0)+' kWh')+'</span></div><div class="v"><span>Verbrauch</span><span>'+nf(d.loadKwh,0)+' kWh</span></div>'+
+      '<div class="temp">'+(d.tMin===null?'–':nf(d.tMin,0)+' … '+nf(d.tMax,0)+' °C')+(d.heating?' <span class="heat">· heizen</span>':'')+'</div>'+
+      '<div class="v'+(d.priceKnown<1?' est':'')+'"><span>Preis Ø</span><span>'+(d.priceCt===null?'–':nf(d.priceCt,1)+' ct'+(d.priceKnown<1?' ≈':''))+'</span></div>'+
+      (sur===null?'':'<span class="sur '+(sur>=0?'plus':'minus')+'">'+nf(Math.abs(sur),0)+' kWh '+(sur>=0?'Überschuss':'aus dem Netz')+'</span>')+'</div>'; }).join('');
+}
+function renderSrc(){
+  var p=D.prices, f=D.forecast, h='';
+  h+='<div><h3>Strompreis</h3><div class="kv"><span>Börse</span><span class="n">'+({awattar:'aWATTar',energycharts:'Energy-Charts',none:'keine, Ersatzpreis'})[p.source]+'</span><span>Stand</span><span class="n">'+(p.updatedAt?hm(p.updatedAt):'–')+'</span><span>Bekannt bis</span><span class="n">'+(p.knownUntil?esc(dayName(p.knownUntil-1))+' '+hm(p.knownUntil):'–')+'</span><span>Verlauf für Schätzung</span><span class="n">'+(p.historyDays||0)+' Tage</span><span>Jetzt</span><span class="n">'+nf(p.now.buy,1)+' ct/kWh'+(p.now.spot!==null?' (Börse '+nf(p.now.spot,1)+')':'')+'</span><span>Feste Bestandteile</span><span class="n">'+nf(p.fixedCt,1)+' ct + '+nf(p.vatPercent,0)+' % MwSt</span><span>Einspeisung</span><span class="n">'+nf(p.feedInCt,1)+' ct/kWh</span></div>'+(p.hasTomorrow?'<span class="chip ok">Preise für morgen da</span>':'<span class="chip">Preise für morgen fehlen noch</span>')+'</div>';
+  h+='<div><h3>PV und Wetter</h3><div class="kv"><span>Dienst</span><span class="n">'+(f.provider==='forecastsolar'?'forecast.solar + Open-Meteo':'Open-Meteo')+'</span><span>Stand</span><span class="n">'+(f.updatedAt?hm(f.updatedAt):'–')+'</span><span>Anlage</span><span class="n">'+nf(f.kwp,1)+' kWp, '+f.planes+' Dachfläche'+(f.planes===1?'':'n')+'</span><span>Heute / morgen</span><span class="n">'+nf(f.todayKwh,1)+' / '+nf(f.tomorrowKwh,1)+' kWh</span><span>Lernfaktor</span><span class="n">'+nf(f.factor,2)+'</span></div>'+(f.cal&&f.cal.length?'<div class="sub" style="margin-top:6px">Zuletzt: '+f.cal.slice(-3).map(function(c){return c.day.slice(5)+' '+nf(c.forecast,0)+'→'+nf(c.actual,0)+' kWh';}).join(', ')+'</div>':'')+'</div>';
+  h+='<div><h3>Planer</h3><div class="kv"><span>Takt</span><span class="n">alle '+D.params.tickSeconds+' s, Plan alle 15 min</span><span>Batterie</span><span class="n">'+D.params.minSoc+'–'+D.params.maxSoc+' %, Netzladen bis '+nf(D.params.chargeW,0)+' W</span><span>Wirkungsgrad</span><span class="n">'+nf(D.params.efficiency*100,0)+' %, Mindestvorteil '+nf(D.params.marginCt,1)+' ct</span><span>Wechselrichter</span><span class="n">'+(D.applied?esc(D.applied):'nicht angefasst')+'</span></div></div>';
+  $('src').innerHTML=h;
+}
+function renderLog(){ $('log').innerHTML=(D.log||[]).slice().reverse().map(function(e){ return '<div><span class="t">'+new Date(e.t).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span><span>'+esc(e.text)+'</span></div>'; }).join('')||'<div><span class="t"></span><span class="sub">Noch nichts protokolliert.</span></div>'; }
+
+function render(){ renderHead(); renderBand(); renderSteps(); renderSaving(); renderHp(); renderWeek(); renderSrc(); renderLog(); }
+
+/* ---------- Aktionen ---------- */
+Array.prototype.forEach.call($('modeSeg').querySelectorAll('button'),function(b){
+  b.onclick=function(){ var m=b.getAttribute('data-m'); if(D&&m===D.mode) return;
+    if(m==='active'&&!window.confirm('Aktiv schalten?\n\nDer Planer schreibt dann den Zwangsmodus des Wechselrichters (Laden aus dem Netz, Batterie schonen) und, wenn freigegeben, die Sollwert-Verschiebung der Wärmepumpe. Er lässt sich jederzeit zurück auf Simulation stellen.')) return;
+    busy=true; renderHead(); api({action:'mode',mode:m}).then(function(j){ busy=false; if(j.error){ $('err').hidden=false; $('err').textContent=j.error; } D=j.state; render(); }); };
+});
+$('replan').onclick=function(){ this.disabled=true; var b=this; api({action:'replan'}).then(function(j){ D=j.state; render(); b.disabled=false; }); };
+$('refresh').onclick=function(){ this.disabled=true; var b=this; api({action:'refresh'}).then(function(){ setTimeout(function(){ load(); b.disabled=false; },2500); }); };
+load(); setInterval(load,20000);
+})();
+</script>
+</body>
+</html>
