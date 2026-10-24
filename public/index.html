@@ -391,8 +391,8 @@ function renderBus(inv, live){
   var b = inv.battery, plant = live.plant||{pvPower:inv.pvPower,loadPower:inv.loadPower}, i2 = live.inverter2, n2 = meta.inverter2;
   // dir: +1 = speist in die Schiene, -1 = nimmt von der Schiene
   var feeders = [
-    {x:90, top:true,  name:n2?'Solar gesamt':'Solar', w:plant.pvPower, dir:plant.pvPower>20?1:0, col:'--pv',
-      sub:n2 ? meta.inverterName+' '+kw(inv.pvPower)+' + '+n2.name+' '+(i2?kw(i2.acPower):'aus') : 'MPPT '+nf(inv.mppt[0].v,0)+' V / '+nf(inv.mppt[1].v,0)+' V'},
+    {x:90, top:true,  name:(n2||plant.pvExtra)?'Solar gesamt':'Solar', w:plant.pvPower, dir:plant.pvPower>20?1:0, col:'--pv',
+      sub:(n2 ? meta.inverterName+' '+kw(inv.pvPower)+' + '+n2.name+' '+(i2?kw(i2.acPower):'aus') : 'MPPT '+nf(inv.mppt[0].v,0)+' V / '+nf(inv.mppt[1].v,0)+' V'), sub2:plant.pvExtra?'+ Erzeuger '+kw(plant.pvExtra):''},
     {x:430, top:true,  name:'Batterie', w:b.power,      dir:b.power>0?-1:b.power<0?1:0, col:'--batt',
       sub:b.power>0?'lädt':b.power<0?'entlädt':'Ruhe'},
     {x:590, top:false, name:'Netz',     w:inv.gridPower, dir:inv.gridPower>20?1:inv.gridPower<-20?-1:0, col:'--grid',
@@ -409,6 +409,7 @@ function renderBus(inv, live){
     s += '<text class="lbl" x="'+(f.x-4)+'" y="'+ty+'" style="fill:var('+f.col+')">'+f.name+'</text>';
     s += '<text class="val" x="'+(f.x+16)+'" y="'+(f.top?100:160)+'">'+kw(f.w)+'</text>';
     s += '<text class="sub" x="'+(f.x-4)+'" y="'+(f.top?46:236)+'">'+esc(f.sub)+'</text>';
+    if(f.sub2) s += '<text class="sub" x="'+(f.x-4)+'" y="'+(f.top?64:254)+'">'+esc(f.sub2)+'</text>';
   });
   $('bus').innerHTML = s;
 }

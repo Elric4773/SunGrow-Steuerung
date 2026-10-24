@@ -22,6 +22,8 @@
  * Modbus-Verbindungen zum selben Host/Port werden geteilt; ein RS485-Bus hat nur einen Master.
  */
 const R = require('./registers');
+const fs = require('fs');
+const path = require('path');
 const ModbusClient = require('./modbus-client');
 const web = require('./web');
 
@@ -31,7 +33,9 @@ const TEMPLATES = [
   { id: 'sdm72', label: 'Eastron SDM72 (Gesamtwirkleistung)', fc: 4, doc: 30053, type: 'f32', scale: 1, unitId: 1 },
   { id: 'generic', label: 'Anderes Gerät (Register selbst eintragen)', fc: 4, doc: 30001, type: 'u16', scale: 1, unitId: 1 }
 ];
-const ROLES = { house: 'Haus', heatpump: 'Wärmepumpe', car: 'E-Auto', custom: 'Verbraucher' };
+/* pv = Erzeuger (z. B. Mikrowechselrichter hinter einem Shelly oder SDM120): wird zu Solar und zum Hausverbrauch addiert,
+   weil der Hybridwechselrichter fremde Einspeisung als eigene verbucht und seine Hauslast dadurch zu niedrig ausweist. */
+const ROLES = { house: 'Haus', heatpump: 'Wärmepumpe', car: 'E-Auto', pv: 'Erzeuger', custom: 'Verbraucher' };
 const TYPES = { u16: 1, s16: 1, u32: 2, s32: 2, u32le: 2, s32le: 2, f32: 2, f32le: 2 };
 
 function decodeWords(type, w) {
@@ -90,15 +94,36 @@ module.exports = function (ctx) {
   const list = (ctx.cfg || []).filter(function (m) { return m && m.enabled !== false && m.name; });
   const log = ctx.log || function (t) { console.log(new Date().toLocaleTimeString('de-DE') + ' ' + t); };
   const pool = {};
-  const S = list.map(function (m) { return { cfg: m, watts: null, at: 0, error: null, timer: null }; });
+  const S = list.map(function (m) { return { cfg: m, watts: null, at: 0, error: null, timer: null, kwh: 0 }; });
   let stopped = false;
+
+  /* Tagesenergie je Messgerät (Rechteckintegration der Leistung), über Neustarts hinweg in einer kleinen Datei gemerkt */
+  const dayFile = ctx.dataDir ? path.join(ctx.dataDir, 'messgeraete-tag.json') : null;
+  function today() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  let day = today(), lastSave = 0;
+  try {
+    if (dayFile && fs.existsSync(dayFile)) { const j = JSON.parse(fs.readFileSync(dayFile, 'utf8')); if (j.day === day) S.forEach(function (st) { if (typeof j.kwh[st.cfg.name] === 'number') st.kwh = j.kwh[st.cfg.name]; }); }
+  } catch (e) { log('Messgeräte: Tagesenergie nicht geladen (' + e.message + ')'); }
+  function saveDay(force) {
+    if (!dayFile || (!force && Date.now() - lastSave < 60000)) return;
+    lastSave = Date.now();
+    const kwh = {}; S.forEach(function (st) { kwh[st.cfg.name] = st.kwh; });
+    try { fs.writeFileSync(dayFile, JSON.stringify({ day: day, kwh: kwh })); } catch (e) { /* nicht kritisch */ }
+  }
+  function integrate(st, w, now) {
+    const d = today();
+    if (d !== day) { day = d; S.forEach(function (x) { x.kwh = 0; }); }
+    if (st.at && now - st.at < 10 * 60000 && st.watts !== null) st.kwh += Math.max(0, (st.watts + w) / 2) * (now - st.at) / 3600000 / 1000;
+  }
 
   function poll(st) {
     if (stopped) return;
     readOne(st.cfg, pool, ctx.timeoutMs).then(function (v) {
-      const w = Math.round(v * (st.cfg.invert ? -1 : 1));
+      const w = Math.round(v * (st.cfg.invert ? -1 : 1)), now = Date.now();
       if (st.error) log('Messgerät ' + st.cfg.name + ' wird wieder gelesen');
-      st.watts = w; st.at = Date.now(); st.error = null;
+      integrate(st, w, now);
+      st.watts = w; st.at = now; st.error = null;
+      saveDay(false);
     }, function (e) {
       if (st.error !== e.message) log('Messgerät ' + st.cfg.name + ': ' + e.message);
       st.error = e.message;
@@ -107,13 +132,15 @@ module.exports = function (ctx) {
 
   function byRole(role) { return S.filter(function (st) { return st.cfg.role === role && st.watts !== null && Date.now() - st.at < 5 * 60000; }); }
   function sumRole(role) { const l = byRole(role); return l.length ? l.reduce(function (a, st) { return a + st.watts; }, 0) : null; }
+  function kwhRole(role) { if (today() !== day) return 0; return S.filter(function (st) { return st.cfg.role === role; }).reduce(function (a, st) { return a + st.kwh; }, 0); }
 
   return {
     start: function () { S.forEach(function (st, i) { setTimeout(function () { poll(st); }, 500 + i * 300); }); if (S.length) log('Messgeräte: ' + S.map(function (st) { return st.cfg.name + ' (' + ROLES[st.cfg.role] + ', ' + st.cfg.source + ')'; }).join(', ')); },
-    stop: function () { stopped = true; S.forEach(function (st) { if (st.timer) clearTimeout(st.timer); }); Object.keys(pool).forEach(function (k) { pool[k].close(); }); },
+    stop: function () { stopped = true; S.forEach(function (st) { if (st.timer) clearTimeout(st.timer); }); Object.keys(pool).forEach(function (k) { pool[k].close(); }); saveDay(true); },
     sumRole: sumRole,
+    kwhRole: kwhRole,
     state: function () {
-      return S.map(function (st) { return { name: st.cfg.name, role: st.cfg.role, roleLabel: ROLES[st.cfg.role] || st.cfg.role, source: st.cfg.source, watts: st.watts, at: st.at, fresh: st.watts !== null && Date.now() - st.at < 5 * 60000, error: st.error }; });
+      return S.map(function (st) { return { name: st.cfg.name, role: st.cfg.role, roleLabel: ROLES[st.cfg.role] || st.cfg.role, source: st.cfg.source, watts: st.watts, at: st.at, kwhToday: Math.round(st.kwh * 100) / 100, fresh: st.watts !== null && Date.now() - st.at < 5 * 60000, error: st.error }; });
     }
   };
 };

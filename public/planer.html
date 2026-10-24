@@ -297,13 +297,13 @@ function renderHp(){
   var pv=inv?inv.plant.pvPower:0, grid=inv?inv.inverter.gridPower:0, bat=inv?inv.inverter.battery.power:0, house=inv?inv.plant.loadPower:0, soc=inv?inv.inverter.battery.soc:null;
   var hv=h&&h.live?h.live.values:{}, hpFresh=h&&h.live&&Date.now()-h.at<10*60000;
   var M=(LIVE&&LIVE.meters)||[], sumRole=function(r){ var l=M.filter(function(x){return x.role===r&&x.fresh;}); return l.length?l.reduce(function(a,x){return a+x.watts;},0):null; };
-  var mHouse=sumRole('house'), mHp=sumRole('heatpump'), carW=sumRole('car');
-  if(mHouse!==null) house=mHouse;
+  var mHouse=sumRole('house'), mHp=sumRole('heatpump'), carW=sumRole('car'), pvX=sumRole('pv');
+  if(mHouse!==null) house=mHouse+(pvX||0);   // gemessener Hauszähler sitzt meist vor den Erzeugern: deren Leistung kommt dazu
   var hpW = mHp!==null ? mHp : (hpFresh&&hv.elPower!==undefined ? hv.elPower : (hpFresh&&h&&h.live.running ? (D.totals&&D.totals.heat?Math.max(600,D.totals.heat.wattsPerKelvin*Math.max(1,D.params.heat.limitTemp-(hv.outdoorTemp||5))):1500) : 0));
   var hpEst = mHp===null && hpFresh && hv.elPower===undefined && hpW>0;
   var hasHpNode = !!h || mHp!==null;
   var kw=function(w){ return nf(Math.abs(w)/1000,Math.abs(w)<10000?2:1)+' kW'; };
-  var N={ solar:{x:70,y:48,c:'var(--pv)',t:'Solar',v:pv>0?kw(pv):'–'}, grid:{x:290,y:48,c:'var(--grid)',t:'Netz',v:grid?kw(grid)+(grid>0?' Bezug':' Einsp.'):'0 kW'},
+  var N={ solar:{x:70,y:48,c:'var(--pv)',t:'Solar',v:(pv>0?kw(pv):'–')+(pvX?' · '+kw(pvX)+' Erz.':'')}, grid:{x:290,y:48,c:'var(--grid)',t:'Netz',v:grid?kw(grid)+(grid>0?' Bezug':' Einsp.'):'0 kW'},
           house:{x:180,y:150,c:'var(--ink)',t:'Haus',v:kw(house)}, batt:{x:70,y:245,c:'var(--batt)',t:'Batterie',v:(soc!==null?nf(soc,0)+' %':'–')+(bat?' · '+kw(bat)+(bat>0?' lädt':' entlädt'):'')},
           hp:{x:290,y:245,c:'var(--heat)',t:'Wärme-\npumpe',v:hasHpNode?(mHp!==null?kw(hpW):(hpFresh?(hpW>0?(hpEst?'≈ ':'')+kw(hpW):'steht'):'keine Werte')):'nicht eingerichtet'}, car:{x:180,y:258,c:'var(--muted)',t:'E-Auto',v:carW===null?'nicht gemessen':kw(carW)} };
   var out='<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>';

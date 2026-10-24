@@ -141,7 +141,15 @@ Leistung in Watt und hat eine **Rolle**:
 | Haus | ersetzt im Energiefluss und im Lastprofil den aus dem Wechselrichter gerechneten Hausverbrauch |
 | Wärmepumpe | geht in den Verlauf; daraus lernt der Planer die Heizlast je Grad Außentemperatur |
 | E-Auto | eigener Knoten im Energiefluss; wird aus dem Lastprofil herausgerechnet, damit Ladevorgänge die Grundlast nicht verfälschen |
+| Erzeuger | zusätzliche Erzeugung, die der Wechselrichter nicht kennt (Mikrowechselrichter, zweite Anlage): wird zu Solar **und** zum Hausverbrauch addiert, die Tagesenergie läuft mit |
 | Verbraucher | frei benannt, nur Anzeige unter dem Energiefluss |
+
+**Warum „Erzeuger“ auch den Hausverbrauch erhöht.** Der Hybridwechselrichter berechnet seine Hauslast aus der eigenen
+Abgabe und dem, was sein Zähler am Hausanschluss sieht. Speist ein fremder Erzeuger hinter diesem Zähler ein, hält der
+Wechselrichter dessen Strom für seinen eigenen und weist die Hauslast um genau diesen Betrag zu niedrig aus. Ein
+kleiner Zähler an der Leitung des Erzeugers (Shelly Plug oder 1PM per HTTP, Eastron SDM120 per Modbus, ein Zähler am
+Loxone Miniserver) stellt beides richtig. Dasselbe gilt für Stringwechselrichter, dort erledigt es die Option
+„Leistung zum Hausverbrauch addieren“ (Kapitel 2.3).
 
 Drei **Quellen** stehen zur Wahl:
 

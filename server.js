@@ -535,7 +535,8 @@ function store(live) {
     t: now, pv: i.pvPower, load: i.loadPower, grid: i.gridPower, bp: i.battery.power,
     soc: i.battery.soc, bv: i.battery.voltage, ba: i.battery.current, bt: i.battery.temp
   };
-  if (live.inverter2) { s.pv2 = live.inverter2.acPower; s.pv2h = live.plant.loadPower - i.loadPower; }
+  if (live.inverter2) s.pv2 = live.inverter2.acPower;
+  if (live.plant && live.plant.loadPower !== i.loadPower) s.pv2h = live.plant.loadPower - i.loadPower;   // Anteil fremder Erzeuger (Strings, Erzeuger-Messgeräte) an der Hauslast
   if (i.battery.bmsMaxCharge !== undefined) { s.bmc = i.battery.bmsMaxCharge; s.bmd = i.battery.bmsMaxDischarge; }
   if (heatpump) {
     const h = heatpump.state();
@@ -546,6 +547,8 @@ function store(live) {
     if (mh !== null) s.hpw = mh;
     if (mc !== null) s.carw = mc;
     if (mhouse !== null) s.mhouse = mhouse;
+    const mpv = meters.sumRole('pv');
+    if (mpv !== null) s.pvx = mpv;
   }
   if (forecast && live.plant) forecast.reportActual(live.plant.todayPv);
   if (c) {
@@ -684,6 +687,14 @@ function pollOnce() {
       } else {
         live.plant = { pvPower: inv.pvPower, loadPower: inv.loadPower, todayPv: inv.today.pv };
       }
+      if (meters) {
+        /* Erzeuger-Messgeräte (Mikrowechselrichter o. ä.): der Hybrid sieht deren Einspeisung am Zähler als eigene und weist
+           die Hauslast um genau diesen Betrag zu niedrig aus. Deshalb kommt die gemessene Leistung zu Solar UND zu Haus dazu. */
+        const mpv = meters.sumRole('pv');
+        if (mpv !== null && mpv > 0) { live.plant.pvPower += mpv; live.plant.loadPower += mpv; live.plant.pvExtra = mpv; }
+        const mkwh = meters.kwhRole('pv');
+        if (mkwh > 0) { live.plant.todayPv = r(live.plant.todayPv + mkwh, 1); live.plant.todayPvExtra = r(mkwh, 2); }
+      }
       const bat = inv.battery;
       if (Math.abs(bat.power) > 150) { rest.lastActive = Date.now(); rest.lastDir = bat.power > 0 ? 'charge' : 'discharge'; }
       bat.restMinutes = rest.lastActive ? Math.floor((Date.now() - rest.lastActive) / 60000) : null;
@@ -766,7 +777,7 @@ const tlog = function (t) { console.log(new Date().toLocaleTimeString('de-DE') +
 let heatpump = null, prices = null, forecast = null, planner = null, meters = null;
 if (CONFIGURED) {
   try {
-    if (Array.isArray(cfg.meters) && cfg.meters.length) meters = require('./meters')({ cfg: cfg.meters, timeoutMs: cfg.timeoutMs, log: tlog });
+    if (Array.isArray(cfg.meters) && cfg.meters.length) meters = require('./meters')({ cfg: cfg.meters, timeoutMs: cfg.timeoutMs, dataDir: DATA_DIR, log: tlog });
     if (cfg.heatpump.enabled && cfg.heatpump.host) heatpump = require('./heatpump')({ cfg: cfg.heatpump, timeoutMs: cfg.timeoutMs, requestGapMs: 100, log: tlog });
     prices = require('./prices')({ cfg: cfg.prices, dataDir: DATA_DIR, log: tlog, onUpdate: function () { if (planner) planner.invalidate(); } });
     forecast = require('./forecast')({ cfg: cfg.forecast, dataDir: DATA_DIR, log: tlog, onUpdate: function () { if (planner) planner.invalidate(); } });

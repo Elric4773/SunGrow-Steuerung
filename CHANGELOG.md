@@ -14,6 +14,8 @@ Sungrow Steuerung – (C) by Elric M. – nur private Nutzung zu Test- und Lernz
 - Gemessene Werte haben Vorrang: Haus ersetzt den gerechneten Hausverbrauch, Wärmepumpe fließt in die gelernte
   Heizlast, E-Auto wird aus dem Lastprofil herausgerechnet.
 - Energiefluss zeigt E-Auto als Knoten, freie Verbraucher als Liste.
+- Rolle „Erzeuger“ für Mikrowechselrichter und andere Erzeugung, die der Hybrid nicht kennt: Leistung kommt zu Solar
+  und zum Hausverbrauch dazu, Tagesenergie wird mitgezählt (`data/messgeraete-tag.json`).
 
 **Planer**
 - Horizont bis 72 Stunden; unbekannte Preise werden aus dem Wochentagsmuster geschätzt (vier Wochen, Ersatz sieben Tage).
